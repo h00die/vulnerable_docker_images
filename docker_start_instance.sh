@@ -72,6 +72,7 @@ port_busy() { command -v ss >/dev/null 2>&1 && ss -H -ltn "sport = :$1" 2>/dev/n
 BUILD=()
 case "$BOX" in
   web01)
+    BUILD=(--build)   # werkzeug service builds from local Dockerfile
     if port_busy 22; then
       warn "port 22 is already in use — the VM's own sshd probably has it."
       warn "move host sshd to another port so the vulnerable SSH can bind 22 (see README)."
@@ -82,6 +83,7 @@ case "$BOX" in
     fi
     ;;
   files01)
+    BUILD=(--build)   # juniper service builds from local Dockerfile
     if ! lsmod 2>/dev/null | grep -qw nfsd; then
       info "loading NFS kernel modules (nfs, nfsd)"
       if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
@@ -93,8 +95,11 @@ case "$BOX" in
       fi
     fi
     ;;
+  app01)
+    BUILD=(--build)   # brocade service builds from local Dockerfile
+    ;;
   desk01)
-    BUILD=(--build)   # desk01 images build from local Dockerfiles
+    BUILD=(--build)   # x11 + rdp images build from local Dockerfiles
     ;;
 esac
 
@@ -107,10 +112,13 @@ echo
 
 # ---- next steps ----
 case "$BOX" in
-  web01)   ok "DVWA: open http://<this-vm-ip>/setup.php and click Create/Reset Database (admin/password)" ;;
-  files01) ok "Up. Try from Kali:  showmount -e <this-vm-ip>" ;;
+  web01)   ok "DVWA: open http://<this-vm-ip>/setup.php and click Create/Reset Database (admin/password)"
+           ok "Werkzeug debug console: http://<this-vm-ip>:5000/crash  (PIN: 1234)" ;;
+  files01) ok "Up. Try from Kali:  showmount -e <this-vm-ip>"
+           ok "Juniper SSG5 telnet: telnet <this-vm-ip>  (netscreen/netscreen or CVE-2015-7755 backdoor)" ;;
   app01)   ok "Finish the WordPress wizard at http://<this-vm-ip>/ , then seed extra logins:"
-           echo "    docker exec -i mysql mysql -uroot -proot wordpress < wp_seed_users.sql" ;;
+           echo "    docker exec -i mysql mysql -uroot -proot wordpress < wp_seed_users.sql"
+           ok "Brocade telnet: telnet <this-vm-ip>  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)" ;;
   desk01)  ok "X11 on :6000 (open), RDP on :3389 (ubuntu/ubuntu)."
            ok "If RDP doesn't answer on first boot:  ${DC[*]} logs rdp  (then: ${DC[*]} restart rdp)" ;;
 esac

@@ -5,6 +5,7 @@
 #    80/tcp    WordPress 4.6   (outdated core/plugins)
 #    8080/tcp  Tomcat Manager  (tomcat/tomcat + looted admin/admin123)
 #    3306/tcp  MySQL           (root/root)
+#    23/tcp    Brocade FWS624  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)
 #
 #  WordPress reaches the DB on 127.0.0.1:3306 (same VM via host networking).
 #  After the WP install wizard, seed the extra logins:
@@ -49,4 +50,13 @@ services:
     volumes:
       - ./tomcat-setup.sh:/tomcat-setup.sh:ro
     command: ["/bin/bash", "/tomcat-setup.sh"]
+    restart: unless-stopped
+
+  brocade:
+    build: ./brocade
+    image: lab-app01-brocade
+    container_name: brocade
+    network_mode: host          # telnet :23 — Brocade FWS624/ICX6450 emulator
+    cap_add:
+      - NET_BIND_SERVICE
     restart: unless-stopped

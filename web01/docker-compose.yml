@@ -6,9 +6,10 @@
 #  services answer on the VM's address with normal ports. Your Kali box scans
 #  the VM's IP.
 #
-#    80/tcp  DVWA   (SQLi, XSS, upload, cmd injection)
-#    21/tcp  FTP    (ftp/ftp + looted jsmith/backup, writable)
-#    22/tcp  SSH    (root/root + looted jsmith/agarcia/backup)
+#    80/tcp   DVWA      (SQLi, XSS, upload, cmd injection)
+#    21/tcp   FTP       (ftp/ftp + looted jsmith/backup, writable)
+#    22/tcp   SSH       (root/root + looted jsmith/agarcia/backup)
+#    5000/tcp Werkzeug  (Flask debug console, PIN=1234)
 #
 #  >>> PORT 22: the vulnerable SSH wants 22, which the VM's own sshd usually
 #  >>> occupies. Free it first — set `Port 2222` in the VM's /etc/ssh/sshd_config
@@ -40,4 +41,11 @@ services:
     volumes:
       - ./ssh-setup.sh:/ssh-setup.sh:ro
     command: ["/bin/bash", "/ssh-setup.sh"] # adds jsmith/agarcia/backup
+    restart: unless-stopped
+
+  werkzeug:
+    build: ./werkzeug
+    image: lab-web01-werkzeug
+    container_name: werkzeug
+    network_mode: host          # Flask debug app on :5000, PIN=1234
     restart: unless-stopped

@@ -9,6 +9,7 @@
 #    445,139/tcp           Samba "public"     (guest, writable)
 #    6379/tcp              Redis              (no auth)
 #    161/udp               SNMP v2c           (community public/private)
+#    23/tcp                Juniper SSG5       (netscreen/netscreen + CVE-2015-7755 backdoor)
 #
 #  >>> The NFS box needs kernel NFS modules on the VM:  sudo modprobe nfs nfsd
 #  >>> (make it persist — see README). Don't run the VM's own nfs-kernel-server.
@@ -52,8 +53,18 @@ services:
     image: polinux/snmpd
     container_name: snmp
     network_mode: host
+    privileged: true
     command: ["snmpd", "-f", "-Lo", "-c", "/etc/snmp/snmpd.conf"]
     volumes:
       - ./snmpd.conf:/etc/snmp/snmpd.conf:ro
       - ./snmp-secret.txt:/etc/snmp/snmp-secret.txt:ro
+    restart: unless-stopped
+
+  juniper:
+    build: ./juniper
+    image: lab-files01-juniper
+    container_name: juniper
+    network_mode: host          # telnet :23 — Juniper SSG5 emulator
+    cap_add:
+      - NET_BIND_SERVICE
     restart: unless-stopped

