@@ -119,6 +119,6 @@ case "$BOX" in
   app01)   ok "Finish the WordPress wizard at http://<this-vm-ip>/ , then seed extra logins:"
            echo "    docker exec -i mysql mysql -uroot -proot wordpress < wp_seed_users.sql"
            ok "Brocade telnet: telnet <this-vm-ip>  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)" ;;
-  desk01)  ok "X11 on :6000 (open), RDP on :3389 (ubuntu/ubuntu)."
+  desk01)  ok "X11 on :6000 (open), RDP on :3389 (ubuntu/ubuntu), VNC on :5900 (password: password)."
            ok "If RDP doesn't answer on first boot:  ${DC[*]} logs rdp  (then: ${DC[*]} restart rdp)" ;;
 esac

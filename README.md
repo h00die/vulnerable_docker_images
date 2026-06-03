@@ -41,6 +41,7 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | Brocade FWS624 | 23/tcp    | `username`/`password`   | weak telnet creds, config disclosure   |
 | **desk01**  | X11            | 6000/tcp  | none (access control off)| open X display → screenshot/keylog    |
 |             | RDP (xrdp)     | 3389/tcp  | `ubuntu` / `ubuntu`     | weak RDP creds                         |
+|             | VNC (x11vnc)   | 5900/tcp  | `password`              | weak VNC password                      |
 
 \* DVWA: browse to `http://<web01-ip>/setup.php` once, click **Create / Reset
 Database**, then log in with `admin` / `password`.
@@ -289,6 +290,16 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   `xfreerdp /v:<desk01-ip> /u:ubuntu /p:ubuntu` (or the reused
   `jsmith`/`password123`). `hydra -t 4 -l ubuntu -P rockyou.txt rdp://<desk01-ip>`
   is the spray-the-creds exercise.
+- VNC (password auth, port 5900):
+  ```bash
+  nmap -sV -p5900 <desk01-ip>                          # detect VNC
+  vncviewer <desk01-ip>:5900                            # password: password
+  # or with metasploit:
+  # use auxiliary/scanner/vnc/vnc_login
+  # use auxiliary/scanner/vnc/vnc_none_auth
+  ```
+  The VNC desktop shows a sticky note leaking the `backup`/`letmein` credential
+  (also valid on web01 SSH and FTP — credential reuse chain).
 
 ### Add a vulnerable WordPress plugin (optional, makes app01 meatier)
 After the wizard, drop an old plugin with a known CVE into the running container:

@@ -50,14 +50,10 @@ services:
     restart: unless-stopped
 
   snmp:
-    image: polinux/snmpd
+    build: ./snmpd
+    image: lab-files01-snmpd
     container_name: snmp
-    network_mode: host
-    privileged: true
-    command: ["snmpd", "-f", "-Lo", "-c", "/etc/snmp/snmpd.conf"]
-    volumes:
-      - ./snmpd.conf:/etc/snmp/snmpd.conf:ro
-      - ./snmp-secret.txt:/etc/snmp/snmp-secret.txt:ro
+    network_mode: host          # snmpd on UDP :161 (public/private communities)
     restart: unless-stopped
 
   juniper:
