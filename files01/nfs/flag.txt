@@ -1,0 +1,3 @@
+FLAG{open_nfs_no_root_squash}
+This share was exported rw,no_root_squash,* — anyone who mounts it can write
+files as root. Classic data-exposure + privesc primitive.

@@ -1,0 +1,27 @@
+# ============================================================================
+#  desk01 VM  —  "workstation" (insecure remote desktop/display)
+#  Deploy this folder on the desk01 VM and run:  docker compose up -d --build
+#  (the two images build from local Dockerfiles, so the VM needs internet for
+#   the apt steps on first build.)
+#
+#    6000/tcp  X11   (Xvfb with access control disabled — `xhost +` equivalent)
+#    3389/tcp  RDP   (xrdp: ubuntu/ubuntu and looted jsmith/password123)
+#
+#  >>> Run this on a HEADLESS VM (no local desktop), so the VM's own X server /
+#  >>> remote-desktop service doesn't already occupy :0 (6000) or 3389.
+# ============================================================================
+
+services:
+  x11:
+    build: ./x11
+    image: lab-desk01-x11
+    container_name: x11
+    network_mode: host          # X server on TCP :6000, access control off
+    restart: unless-stopped
+
+  rdp:
+    build: ./rdp
+    image: lab-desk01-rdp
+    container_name: rdp
+    network_mode: host          # xrdp on :3389
+    restart: unless-stopped

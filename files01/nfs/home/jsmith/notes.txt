@@ -1,0 +1,5 @@
+reminders
+- finish the wordpress migration to app01
+- ask ops to finally close OPS-1421 (tomcat default login!!)
+- the redis box is wide open, flagged it twice, nothing happened
+- stop leaving the keepass export on the file share

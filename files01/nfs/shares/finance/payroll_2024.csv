@@ -1,0 +1,5 @@
+employee_id,name,email,department,salary,ssn
+1001,John Smith,jsmith@corp.local,Engineering,98000,***-**-1234
+1002,Ana Garcia,agarcia@corp.local,Finance,104000,***-**-5678
+1003,Wei Chen,wchen@corp.local,IT Ops,112000,***-**-9012
+1004,Priya Patel,ppatel@corp.local,HR,87000,***-**-3456

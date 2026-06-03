@@ -1,0 +1,1 @@
+FLAG{weak_ftp_creds_writable_root}

@@ -1,0 +1,59 @@
+# ============================================================================
+#  files01 VM  —  "internal file server"
+#  Deploy this folder on the files01 VM and run:  docker compose up -d
+#
+#  Host networking matters here: NFS uses several dynamic RPC ports that are
+#  painful to publish individually, so binding straight to the VM is cleanest.
+#
+#    2049/tcp (+111, rpc)  NFS export /data   (rw, no_root_squash, *)
+#    445,139/tcp           Samba "public"     (guest, writable)
+#    6379/tcp              Redis              (no auth)
+#    161/udp               SNMP v2c           (community public/private)
+#
+#  >>> The NFS box needs kernel NFS modules on the VM:  sudo modprobe nfs nfsd
+#  >>> (make it persist — see README). Don't run the VM's own nfs-kernel-server.
+# ============================================================================
+
+services:
+  nfs:
+    image: itsthenetwork/nfs-server-alpine:latest
+    container_name: nfs
+    network_mode: host
+    privileged: true
+    environment:
+      SHARED_DIRECTORY: "/data"
+    volumes:
+      - ./nfs:/data
+    restart: unless-stopped
+
+  smb:
+    image: dperson/samba
+    container_name: smb
+    network_mode: host
+    command:
+      - "-p"
+      - "-n"
+      - "-u"
+      - "guest;guest"
+      - "-s"
+      - "public;/share;yes;no;yes;all;none"
+    volumes:
+      - ./smb:/share
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: redis
+    network_mode: host
+    command: ["redis-server", "--bind", "0.0.0.0", "--protected-mode", "no"]
+    restart: unless-stopped
+
+  snmp:
+    image: polinux/snmpd
+    container_name: snmp
+    network_mode: host
+    command: ["snmpd", "-f", "-Lo", "-c", "/etc/snmp/snmpd.conf"]
+    volumes:
+      - ./snmpd.conf:/etc/snmp/snmpd.conf:ro
+      - ./snmp-secret.txt:/etc/snmp/snmp-secret.txt:ro
+    restart: unless-stopped

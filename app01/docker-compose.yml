@@ -1,0 +1,52 @@
+# ============================================================================
+#  app01 VM  —  "application server"
+#  Deploy this folder on the app01 VM and run:  docker compose up -d
+#
+#    80/tcp    WordPress 4.6   (outdated core/plugins)
+#    8080/tcp  Tomcat Manager  (tomcat/tomcat + looted admin/admin123)
+#    3306/tcp  MySQL           (root/root)
+#
+#  WordPress reaches the DB on 127.0.0.1:3306 (same VM via host networking).
+#  After the WP install wizard, seed the extra logins:
+#    docker exec -i mysql mysql -uroot -proot wordpress < wp_seed_users.sql
+# ============================================================================
+
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    network_mode: host          # :3306 on the VM (root/root)
+    environment:
+      MYSQL_ROOT_PASSWORD: "root"
+      MYSQL_DATABASE: "wordpress"
+      MYSQL_USER: "wordpress"
+      MYSQL_PASSWORD: "wordpress"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  wordpress:
+    image: wordpress:4.6-apache
+    container_name: wordpress
+    network_mode: host          # :80
+    environment:
+      WORDPRESS_DB_HOST: "127.0.0.1:3306"
+      WORDPRESS_DB_USER: "wordpress"
+      WORDPRESS_DB_PASSWORD: "wordpress"
+      WORDPRESS_DB_NAME: "wordpress"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tomcat:
+    image: tomcat:9.0
+    container_name: tomcat
+    network_mode: host          # :8080
+    volumes:
+      - ./tomcat-setup.sh:/tomcat-setup.sh:ro
+    command: ["/bin/bash", "/tomcat-setup.sh"]
+    restart: unless-stopped

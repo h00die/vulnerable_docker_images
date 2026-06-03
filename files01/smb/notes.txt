@@ -1,0 +1,3 @@
+IT handover notes (FAKE - lab only)
+- web01 ftp is ftp/ftp
+- the new tomcat box still has the default tomcat/tomcat login, fix later

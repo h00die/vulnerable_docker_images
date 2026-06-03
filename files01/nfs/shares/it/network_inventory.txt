@@ -1,0 +1,15 @@
+INTERNAL HOST INVENTORY  -  IT ops  -  do not distribute
+(hostnames below = the four lab VMs; IPs assigned by the lab network)
+
+  web01     public web app (DVWA), ftp, ssh
+  files01   <-- this box: NFS + SMB file server, redis cache, snmp
+  app01     wordpress + tomcat, mysql backend
+  desk01    staff workstation (rdp), x11 left wide open for screen-share
+
+open tickets:
+  OPS-1421  app01 tomcat manager never locked down, still using install default
+  OPS-1455  web01 ftp account uses the same word as the username, rotate
+  OPS-1460  redis on files01 has no password "internal only for now"
+  OPS-1477  stop keeping the keepass export on the share (passwords_export.csv)
+  OPS-1490  monitoring snmpd on files01 still uses default community (public/private)
+  OPS-1502  desk01 X server still accepts connections from anywhere (xhost +)

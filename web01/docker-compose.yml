@@ -1,0 +1,43 @@
+# ============================================================================
+#  web01 VM  —  "public web server"
+#  Deploy this folder on the web01 VM and run:  docker compose up -d
+#
+#  Host networking: each container binds straight to THIS VM's IP, so the
+#  services answer on the VM's address with normal ports. Your Kali box scans
+#  the VM's IP.
+#
+#    80/tcp  DVWA   (SQLi, XSS, upload, cmd injection)
+#    21/tcp  FTP    (ftp/ftp + looted jsmith/backup, writable)
+#    22/tcp  SSH    (root/root + looted jsmith/agarcia/backup)
+#
+#  >>> PORT 22: the vulnerable SSH wants 22, which the VM's own sshd usually
+#  >>> occupies. Free it first — set `Port 2222` in the VM's /etc/ssh/sshd_config
+#  >>> (manage the VM on 2222), or run web01 headless from the hypervisor console.
+# ============================================================================
+
+services:
+  dvwa:
+    image: vulnerables/web-dvwa
+    container_name: dvwa
+    network_mode: host          # serves :80 (its bundled MySQL stays on localhost)
+    restart: unless-stopped
+
+  ftp:
+    image: delfer/alpine-ftp-server
+    container_name: ftp
+    network_mode: host
+    environment:
+      USERS: "ftp|ftp|/ftp/ftp jsmith|password123 backup|letmein"
+      ADDRESS: "REPLACE_WITH_WEB01_VM_IP"   # <-- this VM's LAN IP (passive FTP)
+    volumes:
+      - ./ftp:/ftp/ftp
+    restart: unless-stopped
+
+  ssh:
+    image: rastasheep/ubuntu-sshd:18.04     # ships root/root (kept)
+    container_name: ssh
+    network_mode: host          # sshd on :22 — see the PORT 22 note above
+    volumes:
+      - ./ssh-setup.sh:/ssh-setup.sh:ro
+    command: ["/bin/bash", "/ssh-setup.sh"] # adds jsmith/agarcia/backup
+    restart: unless-stopped
