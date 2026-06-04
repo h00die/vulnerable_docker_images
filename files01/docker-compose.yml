@@ -15,6 +15,7 @@
 #    110/tcp               James POP3         (same creds as LDAP users)
 #    143/tcp               James IMAP         (same creds as LDAP users)
 #    4555/tcp              James admin        (root/root)
+#    623/udp               OpenIPMI BMC       (CVE-2013-4786 RAKP hash, CVE-2013-4782 cipher zero)
 #
 #  >>> The NFS box needs kernel NFS modules on the VM:  sudo modprobe nfs nfsd
 #  >>> (make it persist — see README). Don't run the VM's own nfs-kernel-server.
@@ -94,4 +95,11 @@ services:
     image: lab-files01-james
     container_name: james
     network_mode: host          # smtp :25  pop3 :110  imap :143  admin :4555
+    restart: unless-stopped
+
+  ipmi:
+    build: ./ipmi
+    image: lab-files01-ipmi
+    container_name: ipmi
+    network_mode: host          # udp :623 — IPMI 2.0 BMC (CVE-2013-4786, CVE-2013-4782)
     restart: unless-stopped

