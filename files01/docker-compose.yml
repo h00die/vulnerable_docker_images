@@ -10,6 +10,7 @@
 #    6379/tcp              Redis              (no auth)
 #    161/udp               SNMP v2c           (community public/private)
 #    23/tcp                Juniper SSG5       (netscreen/netscreen + CVE-2015-7755 backdoor)
+#    389/tcp               OpenLDAP           (anon bind, admin/ldapadmin, cleartext creds)
 #
 #  >>> The NFS box needs kernel NFS modules on the VM:  sudo modprobe nfs nfsd
 #  >>> (make it persist — see README). Don't run the VM's own nfs-kernel-server.
@@ -63,4 +64,23 @@ services:
     network_mode: host          # telnet :23 — Juniper SSG5 emulator
     cap_add:
       - NET_BIND_SERVICE
+    restart: unless-stopped
+
+  ldap:
+    image: osixia/openldap:1.5.0
+    container_name: ldap
+    network_mode: host          # ldap :389 — anonymous bind + weak admin creds
+    cap_add:
+      - NET_BIND_SERVICE
+    environment:
+      LDAP_ORGANISATION: "Corp"
+      LDAP_DOMAIN: "corp.local"
+      LDAP_ADMIN_PASSWORD: "ldapadmin"
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_USERNAME: "ldapro"
+      LDAP_READONLY_USER_PASSWORD: "readonly123"
+      LDAP_TLS: "false"
+    command: ["--copy-service"]
+    volumes:
+      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif
     restart: unless-stopped

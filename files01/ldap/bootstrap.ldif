@@ -1,0 +1,161 @@
+# Organizational Units
+dn: ou=Users,dc=corp,dc=local
+objectClass: organizationalUnit
+ou: Users
+
+dn: ou=Groups,dc=corp,dc=local
+objectClass: organizationalUnit
+ou: Groups
+
+dn: ou=ServiceAccounts,dc=corp,dc=local
+objectClass: organizationalUnit
+ou: ServiceAccounts
+
+# --- Users ---
+
+dn: uid=jsmith,ou=Users,dc=corp,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: jsmith
+cn: John Smith
+sn: Smith
+givenName: John
+mail: jsmith@corp.local
+uidNumber: 1001
+gidNumber: 1001
+homeDirectory: /home/jsmith
+loginShell: /bin/bash
+userPassword: {CLEARTEXT}password123
+description: IT Department - Senior Admin
+title: Senior Systems Administrator
+telephoneNumber: x4412
+
+dn: uid=agarcia,ou=Users,dc=corp,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: agarcia
+cn: Ana Garcia
+sn: Garcia
+givenName: Ana
+mail: agarcia@corp.local
+uidNumber: 1002
+gidNumber: 1002
+homeDirectory: /home/agarcia
+loginShell: /bin/bash
+userPassword: {CLEARTEXT}123456
+description: Finance Department
+title: Finance Analyst
+telephoneNumber: x4501
+
+dn: uid=backup,ou=Users,dc=corp,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: backup
+cn: Backup Operator
+sn: Operator
+givenName: Backup
+mail: backup@corp.local
+uidNumber: 1003
+gidNumber: 1003
+homeDirectory: /home/backup
+loginShell: /bin/bash
+userPassword: {CLEARTEXT}letmein
+description: Automated backup account - DO NOT DELETE
+
+dn: uid=trogdon,ou=Users,dc=corp,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: trogdon
+cn: Terry Rogdon
+sn: Rogdon
+givenName: Terry
+mail: trogdon@corp.local
+uidNumber: 1004
+gidNumber: 1004
+homeDirectory: /home/trogdon
+loginShell: /bin/bash
+userPassword: {CLEARTEXT}ttrogdon
+description: Network Infrastructure Team
+title: Network Engineer
+
+dn: uid=dmudd,ou=Users,dc=corp,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: dmudd
+cn: Dana Mudd
+sn: Mudd
+givenName: Dana
+mail: dmudd@corp.local
+uidNumber: 1005
+gidNumber: 1005
+homeDirectory: /home/dmudd
+loginShell: /bin/bash
+userPassword: {CLEARTEXT}crazypassword
+description: Network Infrastructure Team
+title: Network Engineer
+
+# --- Service Accounts ---
+
+# password intentionally left in description (world-readable via anonymous bind)
+dn: uid=svc-backup,ou=ServiceAccounts,dc=corp,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: svc-backup
+cn: Backup Service Account
+sn: svc-backup
+uidNumber: 2001
+gidNumber: 2001
+homeDirectory: /nonexistent
+loginShell: /bin/false
+userPassword: {CLEARTEXT}Backup2024!
+description: Nightly backup service - passwd: Backup2024!
+mail: svc-backup@corp.local
+
+dn: uid=svc-monitor,ou=ServiceAccounts,dc=corp,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: svc-monitor
+cn: Monitoring Service Account
+sn: svc-monitor
+uidNumber: 2002
+gidNumber: 2002
+homeDirectory: /nonexistent
+loginShell: /bin/false
+userPassword: {CLEARTEXT}Monitor2023
+description: Network monitoring service account
+mail: svc-monitor@corp.local
+
+# --- Groups ---
+
+dn: cn=domain-admins,ou=Groups,dc=corp,dc=local
+objectClass: groupOfNames
+cn: domain-admins
+description: Domain administrators group
+member: uid=jsmith,ou=Users,dc=corp,dc=local
+
+dn: cn=it-staff,ou=Groups,dc=corp,dc=local
+objectClass: groupOfNames
+cn: it-staff
+description: IT department staff
+member: uid=jsmith,ou=Users,dc=corp,dc=local
+member: uid=trogdon,ou=Users,dc=corp,dc=local
+member: uid=dmudd,ou=Users,dc=corp,dc=local
+
+dn: cn=finance,ou=Groups,dc=corp,dc=local
+objectClass: groupOfNames
+cn: finance
+description: Finance department
+member: uid=agarcia,ou=Users,dc=corp,dc=local
+
+dn: cn=service-accounts,ou=Groups,dc=corp,dc=local
+objectClass: groupOfNames
+cn: service-accounts
+description: Service accounts group
+member: uid=svc-backup,ou=ServiceAccounts,dc=corp,dc=local
+member: uid=svc-monitor,ou=ServiceAccounts,dc=corp,dc=local
+member: uid=backup,ou=Users,dc=corp,dc=local
