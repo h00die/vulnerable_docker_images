@@ -11,6 +11,10 @@
 #    161/udp               SNMP v2c           (community public/private)
 #    23/tcp                Juniper SSG5       (netscreen/netscreen + CVE-2015-7755 backdoor)
 #    389/tcp               OpenLDAP           (anon bind, admin/ldapadmin, cleartext creds)
+#    25/tcp                James SMTP 2.3.2   (CVE-2015-7611 path traversal → cron RCE)
+#    110/tcp               James POP3         (same creds as LDAP users)
+#    143/tcp               James IMAP         (same creds as LDAP users)
+#    4555/tcp              James admin        (root/root)
 #
 #  >>> The NFS box needs kernel NFS modules on the VM:  sudo modprobe nfs nfsd
 #  >>> (make it persist — see README). Don't run the VM's own nfs-kernel-server.
@@ -83,4 +87,11 @@ services:
     command: ["--copy-service"]
     volumes:
       - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif
+    restart: unless-stopped
+
+  james:
+    build: ./james
+    image: lab-files01-james
+    container_name: james
+    network_mode: host          # smtp :25  pop3 :110  imap :143  admin :4555
     restart: unless-stopped
