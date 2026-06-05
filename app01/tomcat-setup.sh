@@ -1,6 +1,6 @@
 #!/bin/bash
-# Make Tomcat's Manager app reachable remotely. Keeps the classic default
-# tomcat/tomcat, and adds admin/admin123 (matches the cracked .htpasswd on
+# Make Tomcat's Manager app reachable remotely. Default admin/admin creds,
+# plus tomcat/tomcat and admin/admin123 (matches the cracked .htpasswd on
 # the NFS share). Works on tomcat:9.0 where webapps live in webapps.dist.
 set -e
 
@@ -15,9 +15,9 @@ cat > /usr/local/tomcat/conf/tomcat-users.xml <<'EOF'
   <role rolename="manager-status"/>
   <role rolename="admin-gui"/>
   <role rolename="admin-script"/>
-  <user username="tomcat" password="tomcat"
+  <user username="admin" password="admin"
         roles="manager-gui,manager-script,manager-jmx,manager-status,admin-gui,admin-script"/>
-  <user username="admin" password="admin123"
+  <user username="tomcat" password="tomcat"
         roles="manager-gui,manager-script,manager-jmx,manager-status,admin-gui,admin-script"/>
 </tomcat-users>
 EOF

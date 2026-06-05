@@ -3,7 +3,7 @@
 #  Deploy this folder on the app01 VM and run:  docker compose up -d
 #
 #    80/tcp    WordPress 4.6   (outdated core/plugins)
-#    8080/tcp  Tomcat Manager  (tomcat/tomcat + looted admin/admin123)
+#    8080/tcp  Tomcat Manager  (admin/admin + tomcat/tomcat)
 #    3306/tcp  MySQL           (root/root)
 #    23/tcp    Brocade FWS624  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)
 #
