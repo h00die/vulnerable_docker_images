@@ -7,10 +7,30 @@ show running-config creds:  TopDogUser/mystery
 type 'switchversion' to toggle between 7.2 and 7.4 responses.
 """
 
+import re
 import socket
 import string
 import threading
 import time
+
+# Telnet control bytes
+IAC  = b'\xff'
+WILL = b'\xfb'
+WONT = b'\xfc'
+DO   = b'\xfd'
+DONT = b'\xfe'
+ECHO             = b'\x01'
+SUPPRESS_GO_AHEAD = b'\x03'
+
+# Sent on connect so clients enter character mode and nmap fingerprints as telnet
+TELNET_INIT = (
+    IAC + WILL + ECHO +
+    IAC + WILL + SUPPRESS_GO_AHEAD +
+    IAC + DO   + SUPPRESS_GO_AHEAD
+)
+
+# Strip any IAC sequence (2- or 3-byte) from received data
+_IAC_RE = re.compile(b'\xff[\xfb\xfc\xfd\xfe][\x00-\xff]|\xff\xff|\xff[\xf0-\xfa][\x00-\xff]*\xff\xf0')
 
 PROMPT = "brocade@FWS624>"
 ENABLED_PROMPT = "brocade@FW624#"
@@ -245,6 +265,7 @@ class _Session(threading.Thread):
         with _lock:
             _sessions.append(self)
         print(f'[brocade] connected {self.addr}')
+        _send(self.sock, TELNET_INIT)
         _send(self.sock, BANNER)
         try:
             while True:
@@ -253,10 +274,10 @@ class _Session(threading.Thread):
                 raw = _recv(self.sock)
                 if raw is None:
                     break
-                # skip bare telnet control sequences
-                if raw and raw[0] not in string.printable:
+                # strip telnet IAC sequences before processing
+                raw = _IAC_RE.sub(b'', raw.encode('latin-1')).decode('latin-1', errors='ignore')
+                if not cmd:
                     continue
-                cmd = raw.strip()
                 cmd_upper = cmd.upper()
 
                 if cmd_upper in ('QUIT', 'LOGOUT'):
