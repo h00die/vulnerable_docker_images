@@ -8,14 +8,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return (
-        '<h1>Internal Analytics Dashboard</h1>'
-        '<p>Status: <strong>operational</strong></p>'
-        '<ul>'
-        '<li><a href="/api/status">/api/status</a></li>'
-        '<li><a href="/api/data">/api/data</a></li>'
-        '</ul>'
-    )
+    raise RuntimeError("Analytics service error — debug console active")
 
 
 @app.route('/api/status')
@@ -26,12 +19,6 @@ def status():
 @app.route('/api/data')
 def data():
     return jsonify({"records": 1042, "processed": 987, "pending": 55})
-
-
-@app.route('/crash')
-def crash():
-    # Intentionally throws to surface the Werkzeug interactive debugger
-    raise RuntimeError("debug endpoint triggered")
 
 
 if __name__ == '__main__':
