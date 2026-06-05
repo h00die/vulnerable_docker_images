@@ -72,7 +72,8 @@ services:
     restart: unless-stopped
 
   ldap:
-    image: osixia/openldap:1.5.0
+    build: ./ldap
+    image: lab-files01-ldap
     container_name: ldap
     network_mode: host          # ldap :389 — anonymous bind + weak admin creds
     cap_add:
