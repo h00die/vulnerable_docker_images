@@ -8,8 +8,7 @@
 #    23/tcp    Brocade FWS624  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)
 #
 #  WordPress reaches the DB on 127.0.0.1:3306 (same VM via host networking).
-#  After the WP install wizard, seed the extra logins:
-#    docker exec -i mysql mysql -uroot -proot wordpress < wp_seed_users.sql
+#  Auto-installs on first boot with admin:admin and seeds lab users. No wizard needed.
 # ============================================================================
 
 services:
@@ -30,7 +29,8 @@ services:
     restart: unless-stopped
 
   wordpress:
-    image: wordpress:4.6-apache
+    build: ./wordpress
+    image: lab-app01-wordpress
     container_name: wordpress
     network_mode: host          # :80
     environment:
@@ -38,6 +38,11 @@ services:
       WORDPRESS_DB_USER: "wordpress"
       WORDPRESS_DB_PASSWORD: "wordpress"
       WORDPRESS_DB_NAME: "wordpress"
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME',    'http://' . $_SERVER['HTTP_HOST']);
+        define('WP_SITEURL', 'http://' . $_SERVER['HTTP_HOST']);
+    volumes:
+      - ./wp_seed_users.sql:/docker-entrypoint-initdb.d/wp_seed_users.sql:ro
     depends_on:
       mysql:
         condition: service_healthy
