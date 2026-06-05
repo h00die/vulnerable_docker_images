@@ -2,13 +2,10 @@
 """Internal analytics dashboard — debug mode intentionally left on."""
 
 from flask import Flask, jsonify
+from werkzeug.debug import DebuggedApplication
+from werkzeug.serving import run_simple
 
 app = Flask(__name__)
-
-
-@app.route('/')
-def index():
-    raise RuntimeError("Analytics service error — debug console active")
 
 
 @app.route('/api/status')
@@ -21,5 +18,8 @@ def data():
     return jsonify({"records": 1042, "processed": 987, "pending": 55})
 
 
+# Expose the interactive Python console at / with no PIN
+application = DebuggedApplication(app, evalex=True, console_path='/', pin_security=False)
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    run_simple('0.0.0.0', 5000, application, use_debugger=False, use_reloader=False)
