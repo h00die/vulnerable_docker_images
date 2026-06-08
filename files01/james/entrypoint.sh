@@ -51,32 +51,32 @@ def drain(s, wait=0.6):
     s.settimeout(None)
     return buf.decode(errors="replace")
 
+def recv_fixed(s, t=3):
+    s.settimeout(t)
+    buf = b""
+    try:
+        while True:
+            chunk = s.recv(4096)
+            if chunk: buf += chunk
+    except: pass
+    s.settimeout(None)
+    return buf
+
 s = socket.socket()
 s.connect(("127.0.0.1", 4555))
-read_until(s, "Login id:")
+banner = recv_fixed(s)
+print(f"[DEBUG] banner: {repr(banner)}")
+
 s.sendall(b"root\r\n")
-read_until(s, "Password:")
+r1 = recv_fixed(s)
+print(f"[DEBUG] after loginid: {repr(r1)}")
+
 s.sendall(b"root\r\n")
-drain(s, 1.5)  # consume welcome message
+r2 = recv_fixed(s)
+print(f"[DEBUG] after password: {repr(r2)}")
 
-s.sendall(b"adddomain corp.local\r\n")
-drain(s)
-
-users = [
-    ("jsmith",   "password123"),
-    ("agarcia",  "123456"),
-    ("backup",   "letmein"),
-    ("trogdon",  "ttrogdon"),
-    ("dmudd",    "crazypassword"),
-]
-for user, pw in users:
-    s.sendall(f"adduser {user} {pw}\r\n".encode())
-    resp = drain(s)
-    print(f"[james] adduser {user}: {resp.strip()}")
-
-s.sendall(b"quit\r\n")
 s.close()
-print("[james] Users seeded.")
+print("[james] Debug done.")
 EOF
 
     touch "$INIT_FLAG"
