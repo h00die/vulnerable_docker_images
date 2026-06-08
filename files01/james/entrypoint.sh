@@ -51,32 +51,49 @@ def drain(s, wait=0.6):
     s.settimeout(None)
     return buf.decode(errors="replace")
 
-def recv_fixed(s, t=3):
-    s.settimeout(t)
+def drain(s, wait=0.6):
+    s.settimeout(0.1)
     buf = b""
-    try:
-        while True:
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        try:
             chunk = s.recv(4096)
-            if chunk: buf += chunk
-    except: pass
+            if chunk:
+                buf += chunk
+                deadline = time.time() + 0.2
+        except socket.timeout:
+            break
     s.settimeout(None)
-    return buf
+    return buf.decode(errors="replace")
 
 s = socket.socket()
 s.connect(("127.0.0.1", 4555))
-banner = recv_fixed(s)
-print(f"[DEBUG] banner: {repr(banner)}")
+drain(s, 2)           # consume banner + "Login id:"
 
 s.sendall(b"root\r\n")
-r1 = recv_fixed(s)
-print(f"[DEBUG] after loginid: {repr(r1)}")
+drain(s)              # consume "Password:"
 
 s.sendall(b"root\r\n")
-r2 = recv_fixed(s)
-print(f"[DEBUG] after password: {repr(r2)}")
+drain(s, 1.5)         # consume welcome message
 
+s.sendall(b"adddomain corp.local\r\n")
+drain(s)
+
+users = [
+    ("jsmith",   "password123"),
+    ("agarcia",  "123456"),
+    ("backup",   "letmein"),
+    ("trogdon",  "ttrogdon"),
+    ("dmudd",    "crazypassword"),
+]
+for user, pw in users:
+    s.sendall(f"adduser {user} {pw}\r\n".encode())
+    resp = drain(s)
+    print(f"[james] adduser {user}: {resp.strip()}")
+
+s.sendall(b"quit\r\n")
 s.close()
-print("[james] Debug done.")
+print("[james] Users seeded.")
 EOF
 
     touch "$INIT_FLAG"

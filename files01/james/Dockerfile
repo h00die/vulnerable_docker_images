@@ -10,7 +10,8 @@ RUN wget -q https://archive.apache.org/dist/james/server/james-binary-2.3.2.1.ta
     && tar xzf /tmp/james.tar.gz -C /opt \
     && rm /tmp/james.tar.gz \
     && mv /opt/james-2.3.2.1 /opt/james \
-    && chmod +x /opt/james/bin/*.sh
+    && chmod +x /opt/james/bin/*.sh \
+    && sed -i 's/password="!changeme!"/password="root"/' /opt/james/apps/james/SAR-INF/config.xml
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
