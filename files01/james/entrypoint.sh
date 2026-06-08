@@ -8,7 +8,7 @@ cron
 /opt/james/bin/run.sh &
 JAMES_PID=$!
 
-INIT_FLAG=/opt/james/var/.lab_initialized
+INIT_FLAG=/opt/james/.lab_initialized
 
 if [ ! -f "$INIT_FLAG" ]; then
     echo "[james] Waiting for admin port 4555..."
@@ -29,9 +29,10 @@ def cmd(s, line):
 s = socket.socket()
 s.connect(("127.0.0.1", 4555))
 time.sleep(0.5)
-s.recv(4096)  # banner
+s.recv(4096)  # banner + "Login id:"
 
-cmd(s, "login root root")
+cmd(s, "root")   # login id → receives "Password:"
+cmd(s, "root")   # password  → receives welcome
 cmd(s, "adddomain corp.local")
 
 users = [
