@@ -21,19 +21,46 @@ if [ ! -f "$INIT_FLAG" ]; then
     python3 - <<'EOF'
 import socket, time
 
-def cmd(s, line):
-    s.sendall((line + "\r\n").encode())
-    time.sleep(0.4)
-    return s.recv(4096).decode(errors="replace")
+def read_until(s, marker, timeout=10):
+    s.settimeout(0.1)
+    buf = b""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            chunk = s.recv(4096)
+            if chunk:
+                buf += chunk
+                if marker.encode() in buf:
+                    return buf.decode(errors="replace")
+        except socket.timeout:
+            continue
+    return buf.decode(errors="replace")
+
+def drain(s, wait=0.6):
+    s.settimeout(0.1)
+    buf = b""
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        try:
+            chunk = s.recv(4096)
+            if chunk:
+                buf += chunk
+                deadline = time.time() + 0.2
+        except socket.timeout:
+            break
+    s.settimeout(None)
+    return buf.decode(errors="replace")
 
 s = socket.socket()
 s.connect(("127.0.0.1", 4555))
-time.sleep(0.5)
-s.recv(4096)  # banner + "Login id:"
+read_until(s, "Login id:")
+s.sendall(b"root\r\n")
+read_until(s, "Password:")
+s.sendall(b"root\r\n")
+drain(s, 1.5)  # consume welcome message
 
-cmd(s, "root")   # login id → receives "Password:"
-cmd(s, "root")   # password  → receives welcome
-cmd(s, "adddomain corp.local")
+s.sendall(b"adddomain corp.local\r\n")
+drain(s)
 
 users = [
     ("jsmith",   "password123"),
@@ -43,10 +70,11 @@ users = [
     ("dmudd",    "crazypassword"),
 ]
 for user, pw in users:
-    resp = cmd(s, f"adduser {user} {pw}")
+    s.sendall(f"adduser {user} {pw}\r\n".encode())
+    resp = drain(s)
     print(f"[james] adduser {user}: {resp.strip()}")
 
-cmd(s, "quit")
+s.sendall(b"quit\r\n")
 s.close()
 print("[james] Users seeded.")
 EOF
