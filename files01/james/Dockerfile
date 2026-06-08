@@ -11,7 +11,7 @@ RUN wget -q https://archive.apache.org/dist/james/server/james-binary-2.3.2.1.ta
     && rm /tmp/james.tar.gz \
     && mv /opt/james-2.3.2.1 /opt/james \
     && chmod +x /opt/james/bin/*.sh \
-    && sed -i 's/password="!changeme!"/password="root"/' /opt/james/apps/james/SAR-INF/config.xml
+    && python3 -c "import pathlib; p=pathlib.Path('/opt/james/apps/james/SAR-INF/config.xml'); p.write_text(p.read_text().replace('!changeme!', 'root'))"
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
