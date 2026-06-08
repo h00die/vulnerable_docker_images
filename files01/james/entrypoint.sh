@@ -4,6 +4,13 @@ set -e
 # cron daemon required for CVE-2015-7611 Cron target (writes to /etc/cron.d/)
 cron
 
+# Normalize admin password to root/root (default ships as !changeme!)
+python3 -c "
+import pathlib
+p = pathlib.Path('/opt/james/apps/james/SAR-INF/config.xml')
+p.write_text(p.read_text().replace('!changeme!', 'root'))
+"
+
 # Start James
 /opt/james/bin/run.sh &
 JAMES_PID=$!
