@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Internal analytics dashboard — debug mode intentionally left on."""
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, redirect
 
 app = Flask(__name__)
 
 
 @app.route('/')
 def index():
-    raise RuntimeError("Analytics service error — debug console active")
+    return redirect('/console')
 
 
 @app.route('/api/status')
