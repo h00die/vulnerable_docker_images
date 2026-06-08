@@ -4,25 +4,6 @@ set -e
 # cron daemon required for CVE-2015-7611 Cron target (writes to /etc/cron.d/)
 cron
 
-CONFIG=/opt/james/apps/james/SAR-INF/config.xml
-
-if [ ! -f "$CONFIG" ]; then
-    # James extracts its SAR on first boot; start it briefly just to unpack
-    /opt/james/bin/run.sh &
-    INIT_PID=$!
-    until [ -f "$CONFIG" ]; do sleep 1; done
-    kill $INIT_PID 2>/dev/null
-    wait $INIT_PID 2>/dev/null || true
-    sleep 1
-fi
-
-# Normalize admin password to root/root (default ships as !changeme!)
-python3 -c "
-import pathlib
-p = pathlib.Path('/opt/james/apps/james/SAR-INF/config.xml')
-p.write_text(p.read_text().replace('!changeme!', 'root'))
-"
-
 # Start James
 /opt/james/bin/run.sh &
 JAMES_PID=$!

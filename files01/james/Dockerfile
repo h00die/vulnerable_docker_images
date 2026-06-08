@@ -12,6 +12,9 @@ RUN wget -q https://archive.apache.org/dist/james/server/james-binary-2.3.2.1.ta
     && mv /opt/james-2.3.2.1 /opt/james \
     && chmod +x /opt/james/bin/*.sh
 
+COPY patch_james.py /tmp/patch_james.py
+RUN python3 /tmp/patch_james.py
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
