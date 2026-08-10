@@ -30,6 +30,7 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | FTP            | 21/tcp    | `ftp` / `ftp`, writable | weak creds / writable FTP root         |
 |             | SSH            | 22/tcp    | `root` / `root`         | weak SSH creds                         |
 |             | Werkzeug       | 5000/tcp  | PIN `1234`              | Flask debug console → RCE              |
+|             | wp2shell (WP 6.9.0) | 8080/tcp | `admin` / `Summer2026!` | **CVE-2026-63030** REST batch route confusion, **CVE-2026-60137** blind SQLi via `author__not_in` → plugin upload RCE |
 | **files01** | NFS export     | 2049/tcp  | `/data`, `rw,*`         | **open NFS share** (no_root_squash)    |
 |             | Samba `public` | 445,139   | guest, writable         | anonymous SMB share                    |
 |             | Redis          | 6379/tcp  | no auth                 | unauthenticated Redis (→ RCE/key write)|
@@ -171,8 +172,9 @@ prints the next step. The manual equivalents are below.
 ```bash
 cd web01
 # edit docker-compose.yml: set ftp ADDRESS to THIS VM's LAN IP (passive FTP)
-docker compose up -d
+docker compose up -d   # builds wp2shell on first run (needs internet for WP-CLI)
 # DVWA: open http://<web01-ip>/setup.php and click Create/Reset Database
+# wp2shell: give it ~a minute to auto-install, then http://<web01-ip>:8080/
 ```
 
 **files01 VM** (after `modprobe nfs nfsd` and stopping any local MTA):
@@ -413,6 +415,13 @@ docker exec -it wordpress bash -c \
 ```
 Activate it in `wp-admin`. Pick a plugin/version from a CVE database. (Downloads
 need outbound internet on that VM.)
+
+## External sources
+
+- **web01 wp2shell** (`web01/wp2shell/`, port 8080): adapted from
+  [M4xSec/wp2shell-lab](https://github.com/M4xSec/wp2shell-lab) — the plain
+  `lab/` variant only (the ModSecurity `lab/waf/` variant is not included).
+  Port changed 8888 → 8080 to fit the web01 stack.
 
 ## Teardown
 On each VM, from its folder:

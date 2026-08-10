@@ -10,6 +10,8 @@
 #    21/tcp   FTP       (ftp/ftp + looted jsmith/backup, writable)
 #    22/tcp   SSH       (root/root + looted jsmith/agarcia/backup)
 #    5000/tcp Werkzeug  (Flask debug console, PIN=1234)
+#    8080/tcp wp2shell  (WordPress 6.9.0: CVE-2026-63030 batch-route confusion,
+#                       CVE-2026-60137 blind SQLi; admin/Summer2026!)
 #
 #  >>> PORT 22: the vulnerable SSH wants 22, which the VM's own sshd usually
 #  >>> occupies. Free it first — set `Port 2222` in the VM's /etc/ssh/sshd_config
@@ -49,3 +51,45 @@ services:
     container_name: werkzeug
     network_mode: host          # Flask debug app on :5000, PIN=1234
     restart: unless-stopped
+
+  # wp2shell lab, sourced from https://github.com/M4xSec/wp2shell-lab (the
+  # no-WAF lab/ variant only). WordPress 6.9.0 auto-installs on first boot
+  # (admin/Summer2026!); bridge network keeps its MariaDB off the VM's IP.
+  wp2shell:
+    build: ./wp2shell
+    image: lab-web01-wp2shell
+    container_name: wp2shell
+    ports:
+      - "8080:80"               # answers on the VM's IP via docker-proxy
+    environment:
+      WORDPRESS_DB_HOST: wp2shell-db
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: wp
+      WORDPRESS_DB_NAME: wp
+    depends_on:
+      wp2shell-db:
+        condition: service_healthy
+    volumes:
+      - wp2shell_data:/var/www/html
+    restart: unless-stopped
+
+  wp2shell-db:
+    image: mariadb:11.4
+    container_name: wp2shell-db
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: wp
+      MARIADB_USER: wp
+      MARIADB_PASSWORD: wp
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - wp2shell_db_data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  wp2shell_data:
+  wp2shell_db_data:
