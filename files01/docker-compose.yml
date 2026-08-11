@@ -5,7 +5,8 @@
 #  Host networking matters here: NFS uses several dynamic RPC ports that are
 #  painful to publish individually, so binding straight to the VM is cleanest.
 #
-#    2049/tcp (+111, rpc)  NFS export /data   (rw, no_root_squash, *)
+#    2049,111,20048/tcp    NFS v3+v4 export /data (rw, no_root_squash, *)
+#                           (local ./nfsd build — serves mountd so showmount works)
 #    445,139/tcp           Samba "public"     (guest, writable)
 #    6379/tcp              Redis              (no auth)
 #    161/udp               SNMP v2c           (community public/private)
@@ -23,12 +24,11 @@
 
 services:
   nfs:
-    image: itsthenetwork/nfs-server-alpine:latest
+    build: ./nfsd
+    image: lab-files01-nfsd
     container_name: nfs
-    network_mode: host
+    network_mode: host          # 2049 nfsd, 111 rpcbind, 20048 mountd, 32765 statd
     privileged: true
-    environment:
-      SHARED_DIRECTORY: "/data"
     volumes:
       - ./nfs:/data
     restart: unless-stopped
