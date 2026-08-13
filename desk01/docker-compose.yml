@@ -6,6 +6,8 @@
 #    6000/tcp  X11   (Xvfb with access control disabled — `xhost +` equivalent)
 #    3389/tcp  RDP   (xrdp: ubuntu/ubuntu and looted jsmith/password123)
 #    5900/tcp  VNC   (x11vnc: password "password")
+#    65534/tcp shell (socat bind shell: straight to bash as jsmith — simulated
+#                     planted backdoor/persistence, no creds required)
 #
 #  >>> Run this on a HEADLESS VM (no local desktop), so the VM's own X server /
 #  >>> remote-desktop service doesn't already occupy :0 (6000) or 3389.
@@ -31,4 +33,11 @@ services:
     image: lab-desk01-vnc
     container_name: vnc
     network_mode: host          # x11vnc on :5900, password "password"
+    restart: unless-stopped
+
+  shell:
+    build: ./shell
+    image: lab-desk01-shell
+    container_name: shell
+    network_mode: host          # socat bind shell on :65534, bash as jsmith
     restart: unless-stopped

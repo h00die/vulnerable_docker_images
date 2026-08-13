@@ -17,6 +17,12 @@
 #    143/tcp               James IMAP         (same creds as LDAP users)
 #    4555/tcp              James admin        (root/root)
 #    623/udp               OpenIPMI BMC       (CVE-2013-4786 RAKP hash, CVE-2013-4782 cipher zero)
+#    873/tcp               rsync              (anonymous, writable "backup" module)
+#    69/udp                TFTP               (anonymous read/write — switch/firewall configs)
+#    6667/tcp              UnrealIRCd 3.2.8.1 (CVE-2010-2075: "AB" lines → system())
+#    27017/tcp             MongoDB 3.6        (no auth)
+#    11211/tcp+udp         memcached          (no auth; UDP left on)
+#    9200/tcp              Elasticsearch 1.4.2 (no auth + CVE-2015-1427 Groovy RCE)
 #
 #  >>> The NFS box needs kernel NFS modules on the VM:  sudo modprobe nfs nfsd
 #  >>> (make it persist — see README). Don't run the VM's own nfs-kernel-server.
@@ -103,4 +109,49 @@ services:
     image: lab-files01-ipmi
     container_name: ipmi
     network_mode: host          # udp :623 — IPMI 2.0 BMC (CVE-2013-4786, CVE-2013-4782)
+    restart: unless-stopped
+
+  rsyncd:
+    build: ./rsyncd
+    image: lab-files01-rsyncd
+    container_name: rsyncd
+    network_mode: host          # :873 — anonymous, listable, WRITABLE rsync module
+    restart: unless-stopped
+
+  tftp:
+    build: ./tftp
+    image: lab-files01-tftp
+    container_name: tftp
+    network_mode: host          # udp :69 — anonymous read/write (device configs w/ creds)
+    cap_add:
+      - NET_BIND_SERVICE
+    restart: unless-stopped
+
+  unrealircd:
+    build: ./unrealircd
+    image: lab-files01-unrealircd
+    container_name: unrealircd
+    network_mode: host          # :6667 — CVE-2010-2075: lines starting with AB → system()
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:3.6
+    container_name: mongo
+    network_mode: host          # :27017 — no auth, seeded intranet creds
+    volumes:
+      - ./mongo/seed.js:/docker-entrypoint-initdb.d/seed.js:ro
+    restart: unless-stopped
+
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: memcached
+    network_mode: host          # :11211 tcp+udp — no auth (UDP re-enabled on purpose)
+    command: ["memcached", "-U", "11211"]
+    restart: unless-stopped
+
+  elasticsearch:
+    build: ./elasticsearch
+    image: lab-files01-elasticsearch
+    container_name: elasticsearch
+    network_mode: host          # :9200 — no auth + CVE-2015-1427 Groovy RCE
     restart: unless-stopped

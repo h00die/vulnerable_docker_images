@@ -1,0 +1,6 @@
+cluster.name: corp-logs
+node.name: files01-logs
+network.host: 0.0.0.0
+http.port: 9200
+# NB: dynamic scripting is enabled by default in 1.4.2 — that default IS the
+# CVE-2015-1427 exposure. Do not "fix" this file by disabling it.

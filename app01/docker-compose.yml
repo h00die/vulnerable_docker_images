@@ -6,6 +6,9 @@
 #    8080/tcp  Tomcat Manager  (admin/admin + tomcat/tomcat)
 #    3306/tcp  MySQL           (root/root)
 #    23/tcp    Brocade FWS624  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)
+#    5432/tcp  PostgreSQL      (postgres/postgres → COPY FROM PROGRAM RCE)
+#    3632/tcp  distccd         (unauth compile jobs → RCE, CVE-2004-2687)
+#    3000/tcp  Grafana 8.0.0   (admin/admin + CVE-2021-43798 path traversal)
 #
 #  WordPress reaches the DB on 127.0.0.1:3306 (same VM via host networking).
 #  Auto-installs on first boot with admin:admin and seeds lab users. No wizard needed.
@@ -64,4 +67,30 @@ services:
     network_mode: host          # telnet :23 — Brocade FWS624/ICX6450 emulator
     cap_add:
       - NET_BIND_SERVICE
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:13-alpine
+    container_name: postgres
+    network_mode: host          # :5432 — postgres/postgres → COPY FROM PROGRAM RCE
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+    volumes:
+      - ./postgres/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    restart: unless-stopped
+
+  distccd:
+    build: ./distccd
+    image: lab-app01-distccd
+    container_name: distccd
+    network_mode: host          # :3632 — unauth distcc → RCE (CVE-2004-2687)
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:8.0.0
+    container_name: grafana
+    network_mode: host          # :3000 — admin/admin + CVE-2021-43798 path traversal
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
     restart: unless-stopped

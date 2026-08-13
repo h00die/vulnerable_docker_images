@@ -12,6 +12,10 @@
 #    5000/tcp Werkzeug  (Flask debug console, PIN=1234)
 #    8080/tcp wp2shell  (WordPress 6.9.0: CVE-2026-63030 batch-route confusion,
 #                       CVE-2026-60137 blind SQLi; admin/Summer2026!)
+#    2121/tcp vsftpd 2.3.4 (CVE-2011-2523: ":)" in USER → root shell on 6200;
+#                       also jsmith/password123 local login)
+#    8081/tcp httpd 2.4.49 (CVE-2021-41773 path traversal → RCE as daemon)
+#    8082/tcp shellshock (unpatched bash 4.3 CGI, CVE-2014-6271 → RCE as www-data)
 #
 #  >>> PORT 22: the vulnerable SSH wants 22, which the VM's own sshd usually
 #  >>> occupies. Free it first — set `Port 2222` in the VM's /etc/ssh/sshd_config
@@ -50,6 +54,27 @@ services:
     image: lab-web01-werkzeug
     container_name: werkzeug
     network_mode: host          # Flask debug app on :5000, PIN=1234
+    restart: unless-stopped
+
+  vsftpd234:
+    build: ./vsftpd234
+    image: lab-web01-vsftpd234
+    container_name: vsftpd234
+    network_mode: host          # ftp :2121 — CVE-2011-2523 smiley backdoor → root shell on :6200
+    restart: unless-stopped
+
+  httpd2449:
+    build: ./httpd2449
+    image: lab-web01-httpd2449
+    container_name: httpd2449
+    network_mode: host          # http :8081 — Apache 2.4.49, CVE-2021-41773 traversal → RCE
+    restart: unless-stopped
+
+  shellshock:
+    build: ./shellshock
+    image: lab-web01-shellshock
+    container_name: shellshock
+    network_mode: host          # http :8082 — unpatched bash 4.3 CGI, CVE-2014-6271
     restart: unless-stopped
 
   # wp2shell lab, sourced from https://github.com/M4xSec/wp2shell-lab (the

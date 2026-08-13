@@ -1,0 +1,6 @@
+notes for the new hires
+=======================
+- file server mount: //files01/public (guest)
+- web01 ftp: ftp/ftp
+- if you lock yourself out of web01, jsmith's password is password123
+- remind dave to stop committing .env files

