@@ -25,6 +25,9 @@ rem EveryoneIncludesAnonymous (null token joins Everyone). NTFS grant is
 rem needed too - the null token is in none of C:'s default ACLs.
 net share C=C:\ /grant:Everyone,READ /remark:"Public"
 reg add "HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v NullSessionShares /t REG_MULTI_SZ /d "C" /f
+rem --- share ENUMERATION via null session needs the srvsvc pipe in the
+rem --- null-pipe list too - access and listing are gated separately
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v NullSessionPipes /t REG_MULTI_SZ /d "SRVSVC" /f
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v EveryoneIncludesAnonymous /t REG_DWORD /d 1 /f
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymous /t REG_DWORD /d 0 /f
 rem --- bonus: let null sessions enumerate SAM users/lists (smb_enumusers)

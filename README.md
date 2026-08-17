@@ -548,7 +548,7 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   ```
   Eval media, never patched, SMBv1 on — EternalBlue works out of the box.
 - Anonymous C:\ share (null session — share ACL + NullSessionShares +
-  EveryoneIncludesAnonymous all deliberately wrong):
+  NullSessionPipes + EveryoneIncludesAnonymous all deliberately wrong):
   ```bash
   smbclient -N -L //<desk02-ip>        # list shares as anonymous
   smbclient -N //<desk02-ip>/C         # browse C:\ with no credentials
