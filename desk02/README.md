@@ -37,7 +37,10 @@ you never sit through it again.
 
 Default login (RDP or the web console): `Docker` / `admin`.
 Added by the softener: `lab_backdoor` / `Passw0rd!` (administrators) and
-`svc_backup` / `backup123`.
+`svc_backup` / `backup123`. The softener also sets
+`LocalAccountTokenFilterPolicy=1`, so `Docker`/`admin` drives SMB-pipe
+tooling (`impacket-atexec`/`smbexec`, `psexec` modules) without a desktop —
+wmiexec won't traverse the NAT though (DCOM needs 135 + dynamic ports).
 
 `./data/` holds the VM disk — it's gitignored; never commit it.
 

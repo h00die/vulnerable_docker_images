@@ -29,6 +29,9 @@ reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v EveryoneIncludesAnonymous
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymous /t REG_DWORD /d 0 /f
 rem --- bonus: let null sessions enumerate SAM users/lists (smb_enumusers)
 reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymousSam /t REG_DWORD /d 0 /f
+rem --- keep full admin tokens over SMB so Docker/admin works with
+rem --- psexec-style tooling (atexec/smbexec/psexec) without UAC filtering
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f
 rem --- read+execute for Everyone down the tree (/t walks all of C:; /c skip
 rem --- errors on TrustedInstaller-owned objects, /q keep it quiet)
 icacls C:\ /grant Everyone:(OI)(CI)RX /t /c /q
