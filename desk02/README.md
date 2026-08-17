@@ -13,23 +13,26 @@ image-level config can ever make them MS17-010-exploitable.
 ## Provision the desk02 VM (it's new)
 
 1. Minimal Ubuntu Server VM like the others (Docker install steps in the root
-   README), but sized bigger — it hosts a whole VM: **4 GB RAM, 2 vCPU,
+   README), but sized bigger — it hosts a whole VM: **4 GB RAM, 4 vCPU,
    40+ GB disk**.
-2. **Enable nested virtualization** on it in your hypervisor (VirtualBox:
-   "Nested VT-x/AMD-V"; VMware: `vhv.enable = "TRUE"`; Proxmox: host CPU type
-   + nested=on), then check `ls -l /dev/kvm`. Without it the compose still
-   runs under TCG software emulation — boots in minutes instead of seconds,
-   fine for scanner modules (delete the `devices:` block if docker complains
-   about the missing device).
+2. **No nested virtualization needed.** This lab's ESXi CPUs can't expose
+   `/dev/kvm`, so the compose deliberately sets `KVM: "N"` and the guest runs
+   under QEMU **TCG software emulation** (~10x slower). Plan for it: expect
+   the unattended install to take an hour or more and regular boots several
+   minutes. Once booted, the box idles and answers SMB/RDP fine — that's all
+   scanner/exploit modules need. Snapshot the desk02 VM right after the first
+   install finishes so you never sit through it twice.
 3. Internet on first `up` — it downloads ~3.1 GB of Windows 7 eval media.
 4. Deploy: `./docker_start_instance.sh desk02` from the lab root, or
    `cd desk02 && docker compose up -d`.
 
 ## First boot
 
-Watch `http://<desk02-ip>:8006` — the unattended install runs, then
-`oem/install.bat` fires (RDP on + NLA off, weak users, firewall off) and the
-box reboots once more. After that it stays up like any other lab box.
+Watch `http://<desk02-ip>:8006` — the unattended install runs (an hour+ under
+TCG — start it and walk away), then `oem/install.bat` fires (RDP on + NLA off,
+weak users, firewall off) and the box reboots once more. After that it stays up
+like any other lab box. Snapshot the desk02 VM once the install finishes so
+you never sit through it again.
 
 Default login (RDP or the web console): `Docker` / `admin`.
 Added by the softener: `lab_backdoor` / `Passw0rd!` (administrators) and
@@ -39,10 +42,10 @@ Added by the softener: `lab_backdoor` / `Passw0rd!` (administrators) and
 
 ## Targets
 
-| Port       | Service       | Modules |
-|------------|---------------|---------|
-| 445/tcp    | SMB, no auth  | `auxiliary/scanner/smb/smb_ms17_010`, `exploit/windows/smb/ms17_010_eternalblue`, `exploit/windows/smb/ms17_010_psexec`, `auxiliary/scanner/smb/smb_login` (weak users) |
-| 3389 tcp/udp | RDP, NLA off | `auxiliary/scanner/rdp/cve_2019_0708_bluekeep`, `auxiliary/scanner/rdp/rdp_scanner` |
+| Port         | Service      | Modules                                                                                                                                                                 |
+|--------------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 445/tcp      | SMB, no auth | `auxiliary/scanner/smb/smb_ms17_010`, `exploit/windows/smb/ms17_010_eternalblue`, `exploit/windows/smb/ms17_010_psexec`, `auxiliary/scanner/smb/smb_login` (weak users) |
+| 3389 tcp/udp | RDP, NLA off | `auxiliary/scanner/rdp/cve_2019_0708_bluekeep`, `auxiliary/scanner/rdp/rdp_scanner`                                                                                     |
 
 ```bash
 # smoke test from Kali once it's up:

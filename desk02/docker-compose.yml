@@ -17,12 +17,17 @@
 #  oem/install.bat additionally: enables RDP w/o NLA (BlueKeep), creates
 #  weak local users, disables the firewall.
 #
-#  REQUIRES /dev/kvm on the desk02 VM (nested virt — a VM hosting a VM):
-#      VirtualBox: enable "Nested VT-x/AMD-V" on the VM
-#      VMware:     vhv.enable = "TRUE" in the .vmx
-#      Proxmox:    host CPU type + nested=on
-#  Without KVM, delete the devices: block — it falls back to TCG software
-#  emulation (very slow boot, still usable for scanner modules).
+#  TCG MODE (on purpose): this lab's ESXi CPUs cannot expose nested KVM, so
+#  there is no devices: block and KVM: "N" below opts out of acceleration —
+#  QEMU software-emulates the guest (~10x slower). Expect the unattended
+#  install to take an hour+, regular boots several minutes; once up, the box
+#  idles and answers SMB/RDP fine, which is all scanner/exploit modules need.
+#  DON'T casually down/up it — the installed disk persists in ./data, and
+#  every cold boot costs minutes. Snapshot the VM after the first install.
+#  (On KVM-capable iron later: drop KVM: "N", add back
+#      devices:
+#        - /dev/kvm
+#   and boots drop to seconds.)
 #
 #    445/tcp        SMB  — MS17-010 (EternalBlue), no auth
 #    3389/tcp+udp   RDP  — BlueKeep (CVE-2019-0708), NLA off
@@ -35,11 +40,12 @@ services:
     container_name: windows
     environment:
       VERSION: "7u"                 # Windows 7 Ultimate, 3.1 GB download
+      KVM: "N"                      # TCG software emulation — see header (no /dev/kvm on this host)
       RAM_SIZE: "2G"
       CPU_CORES: "2"
       DISK_SIZE: "32G"
-    devices:
-      - /dev/kvm
+    # NB: no devices: block — /dev/kvm doesn't exist here (KVM: "N" above
+    # makes dockur skip acceleration instead of erroring out).
     cap_add:
       - NET_ADMIN
     ports:

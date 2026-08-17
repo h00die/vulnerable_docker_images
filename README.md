@@ -135,10 +135,11 @@ into the right folder).
 - **desk01:** its images build from local Dockerfiles, so that VM needs internet
   on first `up --build`. Run it on a **headless** VM (no local desktop) so the
   VM's own X server / RDP isn't already using `:0` (6000) or 3389.
-- **desk02:** a full Windows 7 VM runs *inside* a container, so the desk02 VM
-  needs **nested virtualization** (`/dev/kvm` — see desk02/README.md), 4 GB RAM,
-  ~40 GB disk, and internet on first `up` (~3.1 GB eval media). Without nested
-  virt it still runs, slowly, under software emulation.
+- **desk02:** a full Windows 7 VM runs *inside* a container under QEMU **TCG
+  software emulation** — the ESXi host can't expose nested KVM, so the compose
+  sets `KVM: "N"` and no `/dev/kvm` is needed. Give it 4 vCPU / 4 GB RAM /
+  ~40 GB disk and internet on first `up` (~3.1 GB eval media); expect slow
+  boots and an hour-plus first install (see desk02/README.md).
 
 ## Installing Docker on Ubuntu (run on each VM)
 
@@ -188,7 +189,7 @@ to each VM (or clone the whole repo) and run it with the box name:
 ./docker_start_instance.sh files01      # loads NFS modules, then up
 ./docker_start_instance.sh app01        # up; then run the WP seed it prints
 ./docker_start_instance.sh desk01       # builds the X11/RDP images, then up
-./docker_start_instance.sh desk02       # Win7 VM-in-container (checks /dev/kvm)
+./docker_start_instance.sh desk02       # Win7 VM-in-container (QEMU TCG)
 # other actions: down | restart | logs | status
 ./docker_start_instance.sh app01 logs
 ```
@@ -227,7 +228,7 @@ cd desk01
 docker compose up -d --build  # builds the X11 + xrdp images (needs internet)
 ```
 
-**desk02 VM** (needs `/dev/kvm` — see desk02/README.md):
+**desk02 VM** (QEMU TCG emulation — see desk02/README.md):
 ```bash
 cd desk02
 docker compose up -d          # pulls dockurr/windows; Win7 installs on first boot
@@ -245,7 +246,7 @@ Assumes a minimal Ubuntu Server guest.
 | files01 | 1    | 2 GB   | 4 GB  | Tiny services; the ES JVM wants the RAM.       |
 | app01   | 2    | 2 GB   | 12 GB | MySQL + Tomcat JVM + WordPress together.       |
 | desk01  | 2    | 2 GB   | 14 GB | xfce desktop + X server; image build is chunky.|
-| desk02  | 2    | 4 GB   | 40 GB | hosts a whole Win7 VM (KVM) + its 32 GB disk.  |
+| desk02  | 4    | 4 GB   | 40 GB | Win7 VM under QEMU TCG emulation (slow but OK) |
 
 Each VM pulls ~1–1.5 GB of images (desk02 downloads ~3.1 GB of Windows media on
 first boot). Take a clean snapshot once a box is built so

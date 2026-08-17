@@ -104,10 +104,10 @@ case "$BOX" in
     ;;
   desk02)
     BUILD=()          # dockurr/windows is pulled, not built
-    if [[ ! -e /dev/kvm ]]; then
-      warn "/dev/kvm not found — enable nested virtualization on the desk02 VM"
-      warn "(VirtualBox: Nested VT-x/AMD-V; VMware: vhv.enable; Proxmox: nested=on)"
-      warn "or remove the devices: block in desk02/docker-compose.yml (slow TCG fallback)"
+    if [[ -e /dev/kvm ]]; then
+      info "/dev/kvm found — compose still pins KVM=N (TCG) for this lab's ESXi host"
+    else
+      info "no /dev/kvm (expected on this host) — Win7 runs under QEMU TCG, boots are slow"
     fi
     ;;
 esac
@@ -130,6 +130,6 @@ case "$BOX" in
            ok "Brocade telnet: telnet <this-vm-ip>  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)" ;;
   desk01)  ok "X11 on :6000 (open), RDP on :3389 (ubuntu/ubuntu), VNC on :5900 (password: password)."
            ok "If RDP doesn't answer on first boot:  ${DC[*]} logs rdp  (then: ${DC[*]} restart rdp)" ;;
-  desk02)  ok "First boot downloads ~3.1 GB and installs unattended — watch http://<this-vm-ip>:8006"
+  desk02)  ok "First boot downloads ~3.1 GB; TCG install takes an hour+ — watch http://<this-vm-ip>:8006"
            ok "When up: MS17-010 on 445, BlueKeep on 3389 (logins: Docker/admin, lab_backdoor/Passw0rd!)" ;;
 esac
