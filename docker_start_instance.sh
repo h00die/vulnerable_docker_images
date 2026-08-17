@@ -131,5 +131,6 @@ case "$BOX" in
   desk01)  ok "X11 on :6000 (open), RDP on :3389 (ubuntu/ubuntu), VNC on :5900 (password: password)."
            ok "If RDP doesn't answer on first boot:  ${DC[*]} logs rdp  (then: ${DC[*]} restart rdp)" ;;
   desk02)  ok "First boot downloads ~3.1 GB; TCG install takes an hour+ — watch http://<this-vm-ip>:8006"
-           ok "When up: MS17-010 on 445, BlueKeep on 3389 (logins: Docker/admin, lab_backdoor/Passw0rd!)" ;;
+           ok "When up: MS17-010 on 445, BlueKeep on 3389, anon C: share (smbclient -N //this-ip/C)"
+           ok "Logins: Docker/admin, lab_backdoor/Passw0rd!, svc_backup/backup123" ;;
 esac

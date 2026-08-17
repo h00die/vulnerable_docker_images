@@ -30,7 +30,8 @@ image-level config can ever make them MS17-010-exploitable.
 
 Watch `http://<desk02-ip>:8006` — the unattended install runs (an hour+ under
 TCG — start it and walk away), then `oem/install.bat` fires (RDP on + NLA off,
-weak users, firewall off) and the box reboots once more. After that it stays up
+weak users, firewall off, anonymous read-only `C:\` share) and the box reboots
+once more. After that it stays up
 like any other lab box. Snapshot the desk02 VM once the install finishes so
 you never sit through it again.
 
@@ -42,10 +43,11 @@ Added by the softener: `lab_backdoor` / `Passw0rd!` (administrators) and
 
 ## Targets
 
-| Port         | Service      | Modules                                                                                                                                                                 |
-|--------------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 445/tcp      | SMB, no auth | `auxiliary/scanner/smb/smb_ms17_010`, `exploit/windows/smb/ms17_010_eternalblue`, `exploit/windows/smb/ms17_010_psexec`, `auxiliary/scanner/smb/smb_login` (weak users) |
-| 3389 tcp/udp | RDP, NLA off | `auxiliary/scanner/rdp/cve_2019_0708_bluekeep`, `auxiliary/scanner/rdp/rdp_scanner`                                                                                     |
+| Port         | Service                  | Modules                                                                                                                                                                 |
+|--------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 445/tcp      | SMB, no auth             | `auxiliary/scanner/smb/smb_ms17_010`, `exploit/windows/smb/ms17_010_eternalblue`, `exploit/windows/smb/ms17_010_psexec`, `auxiliary/scanner/smb/smb_login` (weak users) |
+| 445/tcp      | SMB `C` share, anonymous | `smbclient -N //desk02-ip/C` (browse C:), `auxiliary/scanner/smb/smb_enumshares`, `auxiliary/scanner/smb/smb_enumusers`                                                 |
+| 3389 tcp/udp | RDP, NLA off             | `auxiliary/scanner/rdp/cve_2019_0708_bluekeep`, `auxiliary/scanner/rdp/rdp_scanner`                                                                                     |
 
 ```bash
 # smoke test from Kali once it's up:

