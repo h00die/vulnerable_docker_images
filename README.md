@@ -1,19 +1,22 @@
-# Pentest Practice Lab — 4 VMs, one target box each
+# Pentest Practice Lab — 5 VMs, one target box each
 
-Four deliberately-vulnerable hosts, **one per virtual machine** (1:1). Each VM
+Five deliberately-vulnerable hosts, **one per virtual machine** (1:1). Each VM
 runs the Docker stack for its box with **host networking**, so the containers
 bind straight to the VM's own IP on normal ports — the VM *is* the host. Your
-separate Kali box scans the VM IPs like ordinary targets.
+separate Kali box scans the VM IPs like ordinary targets. (desk02 is the one
+exception: its Win7 VM-in-container uses bridge + published ports — identical
+from the LAN.)
 
 ```
    Kali (your attacker box)
         |
-   ── LAN ────────────────────────────────────────────────
-        |             |             |             |
-     web01 VM     files01 VM     app01 VM      desk01 VM
-   DVWA/FTP/SSH   NFS/SMB/       WordPress/    X11 (open)/
-   vsftpd234/     Redis/SNMP/    Tomcat/MySQL  RDP/VNC/shell
-   shellshock     ES/Mongo/IRC   Postgres/Grafana
+   ── LAN ────────────────────────────────────────────────────────────────
+        |             |             |             |             |
+     web01 VM     files01 VM     app01 VM      desk01 VM     desk02 VM
+   DVWA/FTP/SSH   NFS/SMB/       WordPress/    X11 (open)/   Win7 (never
+   vsftpd234/     Redis/SNMP/    Tomcat/MySQL  RDP/VNC/shell patched):
+   shellshock     ES/Mongo/IRC   Postgres/Grafana            MS17-010/
+                                                                BlueKeep
 ```
 
 > ⚠️ Every image here is **intentionally insecure**. Run the VMs on an isolated
@@ -22,8 +25,8 @@ separate Kali box scans the VM IPs like ordinary targets.
 ## Layout
 
 Assign each VM a LAN IP (static or DHCP reservation) and note it down — those
-three IPs are what you scan. The loot refers to the boxes by the hostnames
-`web01` / `files01` / `app01`.
+VM IPs are what you scan. The loot refers to the boxes by the hostnames
+`web01` / `files01` / `app01` / `desk01` / `desk02`.
 
 | VM          | Service        | Port      | Access / creds          | Issue to find                          |
 |-------------|----------------|-----------|-------------------------|----------------------------------------|
@@ -63,6 +66,9 @@ three IPs are what you scan. The loot refers to the boxes by the hostnames
 |             | RDP (xrdp)     | 3389/tcp  | `ubuntu` / `ubuntu`     | weak RDP creds                         |
 |             | VNC (x11vnc)   | 5900/tcp  | `password`              | weak VNC password                      |
 |             | bind shell     | 65534/tcp | none                    | **planted backdoor** -> bash as jsmith |
+| **desk02**  | SMB (Win7)     | 445/tcp   | no auth                 | **CVE-2017-0144** MS17-010 EternalBlue |
+|             | RDP            | 3389/tcp  | `Docker`/`admin`        | **CVE-2019-0708** BlueKeep, NLA off    |
+|             | web console    | 8006/tcp  | browser viewer          | dockur install/login console           |
 
 \* DVWA: browse to `http://<web01-ip>/setup.php` once, click **Create / Reset
 Database**, then log in with `admin` / `password`.
@@ -98,6 +104,7 @@ web01/     -> deploy on the web01 VM   (docker-compose.yml + ssh-setup.sh + ftp/
 files01/   -> deploy on the files01 VM (docker-compose.yml + snmp + nfs/ + smb/ + rsyncd/ + tftp/ + unrealircd/ + mongo/ + elasticsearch/)
 app01/     -> deploy on the app01 VM   (docker-compose.yml + tomcat-setup.sh + wp_seed_users.sql + distccd/ + postgres/)
 desk01/    -> deploy on the desk01 VM  (docker-compose.yml + x11/ + rdp/ + vnc/ + shell/ Dockerfiles)
+desk02/    -> deploy on the desk02 VM  (docker-compose.yml + oem/install.bat — unpatched Win7 VM; see desk02/README.md)
 docker_start_instance.sh  -> helper: ./docker_start_instance.sh <box> [action]
 ```
 
@@ -128,6 +135,10 @@ into the right folder).
 - **desk01:** its images build from local Dockerfiles, so that VM needs internet
   on first `up --build`. Run it on a **headless** VM (no local desktop) so the
   VM's own X server / RDP isn't already using `:0` (6000) or 3389.
+- **desk02:** a full Windows 7 VM runs *inside* a container, so the desk02 VM
+  needs **nested virtualization** (`/dev/kvm` — see desk02/README.md), 4 GB RAM,
+  ~40 GB disk, and internet on first `up` (~3.1 GB eval media). Without nested
+  virt it still runs, slowly, under software emulation.
 
 ## Installing Docker on Ubuntu (run on each VM)
 
@@ -177,6 +188,7 @@ to each VM (or clone the whole repo) and run it with the box name:
 ./docker_start_instance.sh files01      # loads NFS modules, then up
 ./docker_start_instance.sh app01        # up; then run the WP seed it prints
 ./docker_start_instance.sh desk01       # builds the X11/RDP images, then up
+./docker_start_instance.sh desk02       # Win7 VM-in-container (checks /dev/kvm)
 # other actions: down | restart | logs | status
 ./docker_start_instance.sh app01 logs
 ```
@@ -215,6 +227,13 @@ cd desk01
 docker compose up -d --build  # builds the X11 + xrdp images (needs internet)
 ```
 
+**desk02 VM** (needs `/dev/kvm` — see desk02/README.md):
+```bash
+cd desk02
+docker compose up -d          # pulls dockurr/windows; Win7 installs on first boot
+# watch the unattended install at http://<desk02-ip>:8006 (~15-30 min first time)
+```
+
 ## Sizing (per VM)
 
 These are mostly idle; load comes from MySQL init / Tomcat's JVM on first boot.
@@ -226,8 +245,10 @@ Assumes a minimal Ubuntu Server guest.
 | files01 | 1    | 2 GB   | 4 GB  | Tiny services; the ES JVM wants the RAM.       |
 | app01   | 2    | 2 GB   | 12 GB | MySQL + Tomcat JVM + WordPress together.       |
 | desk01  | 2    | 2 GB   | 14 GB | xfce desktop + X server; image build is chunky.|
+| desk02  | 2    | 4 GB   | 40 GB | hosts a whole Win7 VM (KVM) + its 32 GB disk.  |
 
-Each VM pulls ~1–1.5 GB of images. Take a clean snapshot once a box is built so
+Each VM pulls ~1–1.5 GB of images (desk02 downloads ~3.1 GB of Windows media on
+first boot). Take a clean snapshot once a box is built so
 you can roll back after you've trashed it.
 
 ## Scan it (from your Kali box)
@@ -236,7 +257,7 @@ Point Kali at the three VM IPs (substitute your actual addresses):
 
 ```bash
 nmap -sn 192.168.1.0/24                              # find the VMs
-nmap -sV -p- <web01-ip> <files01-ip> <app01-ip> <desk01-ip>   # full TCP + versions
+nmap -sV -p- <web01-ip> <files01-ip> <app01-ip> <desk01-ip> <desk02-ip>   # full TCP + versions
 nmap -sU -p161 <files01-ip>                          # SNMP is UDP
 ```
 
@@ -516,6 +537,26 @@ nmap -sU -p161 <files01-ip>                          # SNMP is UDP
   nmap -sV -p65534 <desk01-ip>  # or a full -p- sweep
   ```
 
+**desk02** (unpatched Windows 7 — see desk02/README.md)
+- SMB / MS17-010 (port 445, no auth):
+  ```bash
+  nmap -p445 --script smb-vuln-ms17-010 <desk02-ip>
+  # msf: use auxiliary/scanner/smb/smb_ms17_010       (check)
+  #      use exploit/windows/smb/ms17_010_eternalblue (kernel RCE)
+  #      use exploit/windows/smb/ms17_010_psexec      (needs creds — lab_backdoor/Passw0rd!)
+  ```
+  Eval media, never patched, SMBv1 on — EternalBlue works out of the box.
+- RDP / BlueKeep (port 3389, NLA deliberately off):
+  ```bash
+  nmap -p3389 --script rdp-vuln-* <desk02-ip>
+  # msf: use auxiliary/scanner/rdp/cve_2019_0708_bluekeep
+  #      use auxiliary/scanner/rdp/rdp_scanner
+  # console/RDP logins: Docker/admin, lab_backdoor/Passw0rd!, svc_backup/backup123
+  ```
+- The installed Windows persists in `desk02/data/` across `down`/`up` — that's
+  realistic (your "compromise" survives), and a full reset means deleting that
+  dir. Snapshot the VM for rollback instead.
+
 ### Add a vulnerable WordPress plugin (optional, makes app01 meatier)
 After the wizard, drop an old plugin with a known CVE into the running container:
 ```bash
@@ -545,8 +586,10 @@ These are **knowingly broken** systems — unauth Redis, root/root SSH, world-
 readable NFS, default Tomcat creds. On a LAN they're reachable by everything on
 that segment, not just Kali.
 
-- Run the three VMs on an **isolated lab network/VLAN** with no route to your
+- Run the VMs on an **isolated lab network/VLAN** with no route to your
   real network or the internet. Not your everyday home/office LAN.
+- **desk02 especially:** unpatched Win7 with the firewall off and SMBv1 on —
+  anything that can reach 445 owns it (that's the point). Lab network only.
 - Don't expose them to the internet or a public cloud with open security groups.
 - Only attack hosts you own. This lab exists so all your targets are yours.
 - Snapshot each VM when built; tear down (`docker compose down -v`) when done.

@@ -4,18 +4,19 @@
 #
 # Usage:
 #   ./docker_start_instance.sh <box> [action]
-#     box     web01 | files01 | app01 | desk01
+#     box     web01 | files01 | app01 | desk01 | desk02
 #     action  up (default) | down | restart | logs | status
 #
 # Examples:
 #   ./docker_start_instance.sh web01           # start web01
 #   ./docker_start_instance.sh desk01          # build + start desk01
+#   ./docker_start_instance.sh desk02          # Win7 VM-in-container (checks /dev/kvm)
 #   ./docker_start_instance.sh files01 down    # stop files01
 #   ./docker_start_instance.sh app01 logs      # tail app01 logs
 #
 set -euo pipefail
 
-BOXES=(web01 files01 app01 desk01)
+BOXES=(web01 files01 app01 desk01 desk02)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 err()  { printf '\033[31m[!]\033[0m %s\n' "$*" >&2; }
@@ -101,6 +102,14 @@ case "$BOX" in
   desk01)
     BUILD=(--build)   # x11 + rdp images build from local Dockerfiles
     ;;
+  desk02)
+    BUILD=()          # dockurr/windows is pulled, not built
+    if [[ ! -e /dev/kvm ]]; then
+      warn "/dev/kvm not found — enable nested virtualization on the desk02 VM"
+      warn "(VirtualBox: Nested VT-x/AMD-V; VMware: vhv.enable; Proxmox: nested=on)"
+      warn "or remove the devices: block in desk02/docker-compose.yml (slow TCG fallback)"
+    fi
+    ;;
 esac
 
 # ---- bring it up ----
@@ -121,4 +130,6 @@ case "$BOX" in
            ok "Brocade telnet: telnet <this-vm-ip>  (username/password, ttrogdon/ttrogdon, dmudd/crazypassword)" ;;
   desk01)  ok "X11 on :6000 (open), RDP on :3389 (ubuntu/ubuntu), VNC on :5900 (password: password)."
            ok "If RDP doesn't answer on first boot:  ${DC[*]} logs rdp  (then: ${DC[*]} restart rdp)" ;;
+  desk02)  ok "First boot downloads ~3.1 GB and installs unattended — watch http://<this-vm-ip>:8006"
+           ok "When up: MS17-010 on 445, BlueKeep on 3389 (logins: Docker/admin, lab_backdoor/Passw0rd!)" ;;
 esac

@@ -1,0 +1,69 @@
+# desk02 — unpatched Windows 7 workstation (VM-in-container)
+
+desk02 is the lab's Windows box: a full, never-patched Windows 7 Ultimate VM
+run under QEMU inside a container (`dockurr/windows`). The guest has its **own
+kernel**, which is the whole point — it's the only way to lab kernel-mode
+Windows CVEs (MS17-010, BlueKeep) on a Linux docker host.
+
+**Why not `microsoft/windows`?** That repo is the official *Windows container
+base image* — it only starts on a Windows docker daemon (a Linux host cannot
+run it at all), and Windows containers share the host kernel, so no
+image-level config can ever make them MS17-010-exploitable.
+
+## Provision the desk02 VM (it's new)
+
+1. Minimal Ubuntu Server VM like the others (Docker install steps in the root
+   README), but sized bigger — it hosts a whole VM: **4 GB RAM, 2 vCPU,
+   40+ GB disk**.
+2. **Enable nested virtualization** on it in your hypervisor (VirtualBox:
+   "Nested VT-x/AMD-V"; VMware: `vhv.enable = "TRUE"`; Proxmox: host CPU type
+   + nested=on), then check `ls -l /dev/kvm`. Without it the compose still
+   runs under TCG software emulation — boots in minutes instead of seconds,
+   fine for scanner modules (delete the `devices:` block if docker complains
+   about the missing device).
+3. Internet on first `up` — it downloads ~3.1 GB of Windows 7 eval media.
+4. Deploy: `./docker_start_instance.sh desk02` from the lab root, or
+   `cd desk02 && docker compose up -d`.
+
+## First boot
+
+Watch `http://<desk02-ip>:8006` — the unattended install runs, then
+`oem/install.bat` fires (RDP on + NLA off, weak users, firewall off) and the
+box reboots once more. After that it stays up like any other lab box.
+
+Default login (RDP or the web console): `Docker` / `admin`.
+Added by the softener: `lab_backdoor` / `Passw0rd!` (administrators) and
+`svc_backup` / `backup123`.
+
+`./data/` holds the VM disk — it's gitignored; never commit it.
+
+## Targets
+
+| Port       | Service       | Modules |
+|------------|---------------|---------|
+| 445/tcp    | SMB, no auth  | `auxiliary/scanner/smb/smb_ms17_010`, `exploit/windows/smb/ms17_010_eternalblue`, `exploit/windows/smb/ms17_010_psexec`, `auxiliary/scanner/smb/smb_login` (weak users) |
+| 3389 tcp/udp | RDP, NLA off | `auxiliary/scanner/rdp/cve_2019_0708_bluekeep`, `auxiliary/scanner/rdp/rdp_scanner` |
+
+```bash
+# smoke test from Kali once it's up:
+msfconsole -q -x 'use auxiliary/scanner/smb/smb_ms17_010; set RHOSTS <desk02-ip>; run; exit'
+```
+
+Want the guest directly on the LAN (its own IP, no port mapping at all)?
+Switch the compose to the macvlan network from the dockur README ("assign an
+individual IP address to the container").
+
+## Variants — swap `VERSION`
+
+- `"xp"` — Windows XP Pro, 0.6 GB: adds MS08-067
+  (`exploit/windows/smb/ms08_067_netapi`) and the XP-era netapi/DCOM classics
+- `"2003"` — Server 2003, 0.6 GB
+- `"11"` / `"2022"` / … — modern, **patched** builds: config-attack practice
+  only (kernel CVEs are fixed in these)
+
+## Isolation
+
+Evaluation media on an isolated lab network only — the softener turns the
+firewall off, and an unpatched Win7 with SMBv1 will be auto-owned by anything
+that touches 445. It must never sit on anything routable to the internet or
+production.

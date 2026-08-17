@@ -1,0 +1,54 @@
+# ============================================================================
+#  desk02 VM  —  "user workstation": unpatched Windows 7 Ultimate
+#  Deploy on the desk02 VM and run:  docker compose up -d
+#  (or from the lab root:  ./docker_start_instance.sh desk02)
+#
+#  Real unpatched Windows (QEMU/KVM full VM via dockur/windows) with its OWN
+#  kernel — the only way to lab kernel-mode Windows CVEs on a Linux docker
+#  host. A true Windows container (microsoft/windows / servercore) can't do
+#  this job: it needs a Windows daemon AND shares the host kernel, so its
+#  patch level is always the host's.
+#
+#  This one service is the whole desk02 box. Unlike the other lab stacks it
+#  uses bridge + published ports (dockur's supported mode — it forwards them
+#  into the guest); on a dedicated VM that looks identical from the LAN.
+#
+#  Win7 eval media is EOL -> never patched -> MS17-010 out of the box.
+#  oem/install.bat additionally: enables RDP w/o NLA (BlueKeep), creates
+#  weak local users, disables the firewall.
+#
+#  REQUIRES /dev/kvm on the desk02 VM (nested virt — a VM hosting a VM):
+#      VirtualBox: enable "Nested VT-x/AMD-V" on the VM
+#      VMware:     vhv.enable = "TRUE" in the .vmx
+#      Proxmox:    host CPU type + nested=on
+#  Without KVM, delete the devices: block — it falls back to TCG software
+#  emulation (very slow boot, still usable for scanner modules).
+#
+#    445/tcp        SMB  — MS17-010 (EternalBlue), no auth
+#    3389/tcp+udp   RDP  — BlueKeep (CVE-2019-0708), NLA off
+#    8006/tcp       web console (watch install / console login)
+# ============================================================================
+
+services:
+  windows:
+    image: dockurr/windows          # NB: double-r on Docker Hub; GitHub org is dockur
+    container_name: windows
+    environment:
+      VERSION: "7u"                 # Windows 7 Ultimate, 3.1 GB download
+      RAM_SIZE: "2G"
+      CPU_CORES: "2"
+      DISK_SIZE: "32G"
+    devices:
+      - /dev/kvm
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "445:445"                   # SMB — nothing else on desk02 owns it
+      - "3389:3389/tcp"             # RDP
+      - "3389:3389/udp"
+      - "8006:8006"                 # web console
+    volumes:
+      - ./data:/storage             # VM disk persists here (gitignored)
+      - ./oem:/oem                  # install.bat softener, runs at end of install
+    stop_grace_period: 2m           # let QEMU shut the guest down cleanly
+    restart: unless-stopped
