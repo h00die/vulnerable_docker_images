@@ -41,6 +41,9 @@ services:
     environment:
       VERSION: "7u"                 # Windows 7 Ultimate, 3.1 GB download
       KVM: "N"                      # TCG software emulation — see header (no /dev/kvm on this host)
+      SAMBA: "N"                    # kill dockur's internal Samba: it otherwise steals 445/139 in
+                                    # the container's QEMU_DNAT iptables chain, so published SMB
+                                    # never reaches the Windows guest (lab doesn't use host-share)
       RAM_SIZE: "2G"
       CPU_CORES: "2"
       DISK_SIZE: "32G"

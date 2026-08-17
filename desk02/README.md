@@ -52,6 +52,26 @@ Added by the softener: `lab_backdoor` / `Passw0rd!` (administrators) and
 msfconsole -q -x 'use auxiliary/scanner/smb/smb_ms17_010; set RHOSTS <desk02-ip>; run; exit'
 ```
 
+## Why `SAMBA: "N"` in the compose
+
+dockur runs its own Samba inside the container (the `\\host.lan\Data`
+host-share feature) and carves **445/139 out of the guest DNAT chain** to
+feed it. With it enabled, published `445:445` is answered by dockur's Samba —
+never by Windows — so SMB scans/modules see nothing (3389/8006 look fine,
+which is confusing). `SAMBA: "N"` disables that; every published port except
+the console (8006/5900) then DNATs straight into the guest. The lab doesn't
+use the host-share feature, so nothing is lost.
+
+For an **already-running** instance without recreating the container (takes
+effect immediately, guest stays up):
+
+```bash
+docker exec windows iptables -t nat -D QEMU_DNAT -p tcp --dport 445 -j RETURN
+docker exec windows iptables -t nat -D QEMU_DNAT -p tcp --dport 139 -j RETURN
+```
+
+Those rules return on container restart unless `SAMBA: "N"` is set.
+
 Want the guest directly on the LAN (its own IP, no port mapping at all)?
 Switch the compose to the macvlan network from the dockur README ("assign an
 individual IP address to the container").
