@@ -20,7 +20,7 @@
 #    873/tcp               rsync              (anonymous, writable "backup" module)
 #    69/udp                TFTP               (anonymous read/write — switch/firewall configs)
 #    6667/tcp              UnrealIRCd 3.2.8.1 (CVE-2010-2075: "AB" lines → system())
-#    27017/tcp             MongoDB 3.6        (no auth)
+#    27017/tcp             MongoDB 3.6        (no auth; zlib wire compression on → CVE-2025-14847 mongobleed)
 #    11211/tcp+udp         memcached          (no auth; UDP left on)
 #    9200/tcp              Elasticsearch 1.4.2 (no auth + CVE-2015-1427 Groovy RCE)
 #
@@ -138,6 +138,9 @@ services:
     image: mongo:3.6
     container_name: mongo
     network_mode: host          # :27017 — no auth, seeded intranet creds
+    # zlib wire compression is NOT in 3.6's defaults (snappy only) — turn it on
+    # so the CVE-2025-14847 (mongobleed) OP_COMPRESSED path is reachable.
+    command: ["mongod", "--networkMessageCompressors", "zlib"]
     volumes:
       - ./mongo/seed.js:/docker-entrypoint-initdb.d/seed.js:ro
     restart: unless-stopped
